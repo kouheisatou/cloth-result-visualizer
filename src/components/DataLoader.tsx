@@ -76,13 +76,20 @@ export function DataLoader({ onDataLoaded }: DataLoaderProps) {
 
     try {
       // Try to load from public folder
-      const baseUrl = import.meta.env.BASE_URL;
+      // Use current location origin and pathname to build correct URLs
+      const base = import.meta.env.BASE_URL || '/';
+      const getDataUrl = (filename: string) => {
+        // Ensure base ends with / and doesn't have duplicate slashes
+        const normalizedBase = base.endsWith('/') ? base : `${base}/`;
+        return `${window.location.origin}${normalizedBase}data/${filename}`;
+      };
+
       const [nodesRes, channelsRes, edgesRes, paymentsRes, configRes] = await Promise.all([
-        fetch(`${baseUrl}data/nodes_output.csv`),
-        fetch(`${baseUrl}data/channels_output.csv`),
-        fetch(`${baseUrl}data/edges_output.csv`),
-        fetch(`${baseUrl}data/payments_output.csv`),
-        fetch(`${baseUrl}data/cloth_input.txt`),
+        fetch(getDataUrl('nodes_output.csv')),
+        fetch(getDataUrl('channels_output.csv')),
+        fetch(getDataUrl('edges_output.csv')),
+        fetch(getDataUrl('payments_output.csv')),
+        fetch(getDataUrl('cloth_input.txt')),
       ]);
 
       if (!nodesRes.ok || !channelsRes.ok || !edgesRes.ok || !paymentsRes.ok || !configRes.ok) {
