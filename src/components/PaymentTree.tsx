@@ -1,4 +1,4 @@
-import { useState, useMemo, useCallback } from 'react';
+import { useState, useMemo, useCallback, type ReactElement } from 'react';
 import type { Payment } from '../types';
 import { formatSatoshi, formatTime } from '../utils/dataParser';
 import './PaymentTree.css';
@@ -232,7 +232,7 @@ export function PaymentTree({ payments, onPaymentSelect, selectedPaymentId }: Pa
   }, []);
 
   // Render tree node (for expanded MPP)
-  const renderTreeNode = (node: TreeNode, isLast: boolean): JSX.Element => {
+  const renderTreeNode = (node: TreeNode, isLast: boolean): ReactElement => {
     const { payment, children, depth } = node;
     const isExpanded = expandedNodes.has(payment.id);
     const hasChildren = children.length > 0;
