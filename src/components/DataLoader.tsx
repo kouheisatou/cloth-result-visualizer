@@ -75,16 +75,14 @@ export function DataLoader({ onDataLoaded }: DataLoaderProps) {
     setError(null);
 
     try {
-      // Use document.baseURI to get the correct base URL
-      // This automatically includes the correct path for GitHub Pages
-      const baseUrl = new URL('.', document.baseURI);
-      
+      // With <base> tag set, relative paths will resolve correctly
+      // e.g., 'data/nodes_output.csv' -> https://kouheisatou.github.io/cloth-result-visualizer/data/nodes_output.csv
       const [nodesRes, channelsRes, edgesRes, paymentsRes, configRes] = await Promise.all([
-        fetch(new URL('data/nodes_output.csv', baseUrl)),
-        fetch(new URL('data/channels_output.csv', baseUrl)),
-        fetch(new URL('data/edges_output.csv', baseUrl)),
-        fetch(new URL('data/payments_output.csv', baseUrl)),
-        fetch(new URL('data/cloth_input.txt', baseUrl)),
+        fetch('data/nodes_output.csv'),
+        fetch('data/channels_output.csv'),
+        fetch('data/edges_output.csv'),
+        fetch('data/payments_output.csv'),
+        fetch('data/cloth_input.txt'),
       ]);
 
       if (!nodesRes.ok || !channelsRes.ok || !edgesRes.ok || !paymentsRes.ok || !configRes.ok) {
