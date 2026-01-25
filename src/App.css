@@ -59,6 +59,35 @@ body {
 .header-actions {
   display: flex;
   gap: 0.75rem;
+  align-items: center;
+}
+
+.view-toggle {
+  display: flex;
+  background: var(--bg-tertiary);
+  border-radius: 8px;
+  padding: 3px;
+  gap: 2px;
+}
+
+.view-btn {
+  padding: 0.4rem 0.8rem;
+  border-radius: 6px;
+  border: none;
+  background: transparent;
+  color: var(--text-secondary);
+  cursor: pointer;
+  font-size: 0.85rem;
+  transition: all 0.2s;
+}
+
+.view-btn:hover {
+  color: var(--text-primary);
+}
+
+.view-btn.active {
+  background: var(--accent-blue);
+  color: white;
 }
 
 .header-actions button {
@@ -829,6 +858,244 @@ body {
   background: var(--text-muted);
 }
 
+/* Gantt View Layout */
+.app-main.gantt-view {
+  grid-template-columns: 1fr 360px;
+}
+
+.gantt-main-panel {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.gantt-side-panel {
+  display: flex;
+  flex-direction: column;
+  overflow-y: auto;
+}
+
+/* Gantt Chart Component */
+.gantt-chart {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  background: var(--bg-card);
+  border-radius: 12px;
+  border: 1px solid var(--border-color);
+  overflow: hidden;
+}
+
+.gantt-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 1rem;
+  border-bottom: 1px solid var(--border-color);
+  flex-shrink: 0;
+}
+
+.gantt-header h3 {
+  font-size: 1rem;
+  color: var(--text-primary);
+}
+
+.gantt-controls {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.filter-group,
+.zoom-group {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.filter-group label,
+.zoom-group label {
+  font-size: 0.8rem;
+  color: var(--text-muted);
+}
+
+.filter-group select {
+  padding: 0.4rem 0.6rem;
+  border-radius: 6px;
+  border: 1px solid var(--border-color);
+  background: var(--bg-tertiary);
+  color: var(--text-primary);
+  font-size: 0.8rem;
+}
+
+.zoom-group input[type="range"] {
+  width: 80px;
+  accent-color: var(--accent-blue);
+}
+
+.zoom-group span {
+  font-size: 0.8rem;
+  font-family: var(--font-mono);
+  color: var(--accent-cyan);
+  min-width: 35px;
+}
+
+.connection-toggle {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+  cursor: pointer;
+}
+
+.connection-toggle input {
+  accent-color: var(--accent-blue);
+}
+
+.gantt-stats {
+  display: flex;
+  gap: 1.5rem;
+  padding: 0.5rem 1rem;
+  background: var(--bg-tertiary);
+  font-size: 0.8rem;
+  color: var(--text-muted);
+  flex-shrink: 0;
+}
+
+.gantt-container {
+  flex: 1;
+  overflow: auto;
+  position: relative;
+}
+
+.gantt-container svg {
+  display: block;
+}
+
+/* Gantt Tooltip */
+.gantt-tooltip {
+  position: absolute;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  padding: 0.75rem;
+  z-index: 100;
+  pointer-events: none;
+  min-width: 200px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4);
+}
+
+.tooltip-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 0.5rem;
+  padding-bottom: 0.5rem;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.tooltip-header .payment-id {
+  font-weight: 600;
+  font-family: var(--font-mono);
+  color: var(--text-primary);
+}
+
+.tooltip-header .attempt-status {
+  font-size: 0.75rem;
+  padding: 0.15rem 0.4rem;
+  border-radius: 4px;
+}
+
+.tooltip-header .attempt-status.success {
+  background: rgba(34, 197, 94, 0.2);
+  color: var(--accent-green);
+}
+
+.tooltip-header .attempt-status.failed {
+  background: rgba(239, 68, 68, 0.2);
+  color: var(--accent-red);
+}
+
+.tooltip-content {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.tooltip-row {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.8rem;
+}
+
+.tooltip-row .label {
+  color: var(--text-muted);
+}
+
+.tooltip-row .value {
+  font-family: var(--font-mono);
+  color: var(--text-primary);
+}
+
+.tooltip-row .value.error {
+  color: var(--accent-red);
+}
+
+.tooltip-row .value.amount {
+  color: var(--accent-yellow);
+}
+
+/* Gantt Legend */
+.gantt-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem;
+  padding: 0.75rem 1rem;
+  border-top: 1px solid var(--border-color);
+  background: var(--bg-tertiary);
+  flex-shrink: 0;
+}
+
+.legend-item {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+}
+
+.legend-color {
+  width: 14px;
+  height: 14px;
+  border-radius: 3px;
+}
+
+.legend-line {
+  width: 20px;
+  height: 3px;
+  border-radius: 2px;
+}
+
+.legend-line.dashed {
+  background: repeating-linear-gradient(
+    90deg,
+    currentColor,
+    currentColor 4px,
+    transparent 4px,
+    transparent 8px
+  );
+}
+
+.legend-line.purple {
+  color: #8b5cf6;
+}
+
+.legend-line.orange {
+  color: #f59e0b;
+}
+
 /* Responsive */
 @media (max-width: 1200px) {
   .app-main {
@@ -854,5 +1121,22 @@ body {
   
   .right-panel {
     order: 3;
+  }
+
+  .app-main.gantt-view {
+    grid-template-columns: 1fr;
+    grid-template-rows: 1fr auto;
+  }
+
+  .gantt-main-panel {
+    min-height: 400px;
+  }
+
+  .gantt-side-panel {
+    max-height: 300px;
+  }
+
+  .gantt-controls {
+    flex-wrap: wrap;
   }
 }

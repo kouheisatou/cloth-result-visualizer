@@ -4,6 +4,7 @@ import { NetworkGraph } from './components/NetworkGraph';
 import { TimelineControl } from './components/TimelineControl';
 import { PaymentDetails } from './components/PaymentDetails';
 import { StatsPanel } from './components/StatsPanel';
+import { GanttChart } from './components/GanttChart';
 import { 
   parseNodes, 
   parseChannels, 
@@ -14,6 +15,8 @@ import {
 } from './utils/dataParser';
 import type { Node, Channel, Edge, Payment, SimulationConfig, TimelineEvent } from './types';
 import './App.css';
+
+type ViewMode = 'network' | 'gantt';
 
 interface SimulationData {
   nodes: Node[];
@@ -30,6 +33,7 @@ function App() {
   const [selectedPayment, setSelectedPayment] = useState<Payment | null>(null);
   const [selectedAttemptIndex, setSelectedAttemptIndex] = useState<number | undefined>();
   const [showStats, setShowStats] = useState(true);
+  const [viewMode, setViewMode] = useState<ViewMode>('network');
 
   const handleDataLoaded = useCallback((rawData: {
     nodesContent: string;
@@ -88,48 +92,84 @@ function App() {
       <header className="app-header">
         <h1>⚡ Lightning Network Visualizer</h1>
         <div className="header-actions">
-          <button onClick={() => setShowStats(!showStats)} className="toggle-stats">
-            {showStats ? '統計を隠す' : '統計を表示'}
-          </button>
+          <div className="view-toggle">
+            <button 
+              className={`view-btn ${viewMode === 'network' ? 'active' : ''}`}
+              onClick={() => setViewMode('network')}
+            >
+              ネットワーク
+            </button>
+            <button 
+              className={`view-btn ${viewMode === 'gantt' ? 'active' : ''}`}
+              onClick={() => setViewMode('gantt')}
+            >
+              ガントチャート
+            </button>
+          </div>
+          {viewMode === 'network' && (
+            <button onClick={() => setShowStats(!showStats)} className="toggle-stats">
+              {showStats ? '統計を隠す' : '統計を表示'}
+            </button>
+          )}
           <button onClick={handleReset} className="reset-btn">
             別のデータを読み込む
           </button>
         </div>
       </header>
 
-      <main className="app-main">
-        <div className="left-panel">
-          {showStats && (
-            <StatsPanel payments={data.payments} config={data.config} />
-          )}
-          <TimelineControl
-            events={data.events}
-            payments={data.payments}
-            currentStepIndex={currentStepIndex}
-            onStepChange={setCurrentStepIndex}
-            onPaymentSelect={handlePaymentSelect}
-          />
-        </div>
+      {viewMode === 'network' ? (
+        <main className="app-main">
+          <div className="left-panel">
+            {showStats && (
+              <StatsPanel payments={data.payments} config={data.config} />
+            )}
+            <TimelineControl
+              events={data.events}
+              payments={data.payments}
+              currentStepIndex={currentStepIndex}
+              onStepChange={setCurrentStepIndex}
+              onPaymentSelect={handlePaymentSelect}
+            />
+          </div>
 
-        <div className="center-panel">
-          <NetworkGraph
-            channels={data.channels}
-            edges={data.edges}
-            payments={data.payments}
-            currentEvents={currentEvents}
-            selectedPayment={selectedPayment}
-          />
-        </div>
+          <div className="center-panel">
+            <NetworkGraph
+              channels={data.channels}
+              edges={data.edges}
+              payments={data.payments}
+              currentEvents={currentEvents}
+              selectedPayment={selectedPayment}
+            />
+          </div>
 
-        <div className="right-panel">
-          <PaymentDetails
-            payment={selectedPayment}
-            edges={data.edges}
-            onAttemptSelect={handleAttemptSelect}
-            selectedAttemptIndex={selectedAttemptIndex}
-          />
-        </div>
-      </main>
+          <div className="right-panel">
+            <PaymentDetails
+              payment={selectedPayment}
+              edges={data.edges}
+              onAttemptSelect={handleAttemptSelect}
+              selectedAttemptIndex={selectedAttemptIndex}
+            />
+          </div>
+        </main>
+      ) : (
+        <main className="app-main gantt-view">
+          <div className="gantt-main-panel">
+            <GanttChart 
+              payments={data.payments}
+              onPaymentSelect={handlePaymentSelect}
+              selectedPaymentId={selectedPayment?.id}
+            />
+          </div>
+          <div className="gantt-side-panel">
+            <PaymentDetails
+              payment={selectedPayment}
+              edges={data.edges}
+              onAttemptSelect={handleAttemptSelect}
+              selectedAttemptIndex={selectedAttemptIndex}
+            />
+          </div>
+        </main>
+      )}
     </div>
   );
 }
