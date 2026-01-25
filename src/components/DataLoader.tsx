@@ -76,12 +76,13 @@ export function DataLoader({ onDataLoaded }: DataLoaderProps) {
 
     try {
       // Try to load from public folder
+      const baseUrl = import.meta.env.BASE_URL;
       const [nodesRes, channelsRes, edgesRes, paymentsRes, configRes] = await Promise.all([
-        fetch('/data/nodes_output.csv'),
-        fetch('/data/channels_output.csv'),
-        fetch('/data/edges_output.csv'),
-        fetch('/data/payments_output.csv'),
-        fetch('/data/cloth_input.txt'),
+        fetch(`${baseUrl}data/nodes_output.csv`),
+        fetch(`${baseUrl}data/channels_output.csv`),
+        fetch(`${baseUrl}data/edges_output.csv`),
+        fetch(`${baseUrl}data/payments_output.csv`),
+        fetch(`${baseUrl}data/cloth_input.txt`),
       ]);
 
       if (!nodesRes.ok || !channelsRes.ok || !edgesRes.ok || !paymentsRes.ok || !configRes.ok) {
