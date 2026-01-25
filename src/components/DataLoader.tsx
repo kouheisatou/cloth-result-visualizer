@@ -75,21 +75,16 @@ export function DataLoader({ onDataLoaded }: DataLoaderProps) {
     setError(null);
 
     try {
-      // Try to load from public folder
-      // Use current location origin and pathname to build correct URLs
-      const base = import.meta.env.BASE_URL || '/';
-      const getDataUrl = (filename: string) => {
-        // Ensure base ends with / and doesn't have duplicate slashes
-        const normalizedBase = base.endsWith('/') ? base : `${base}/`;
-        return `${window.location.origin}${normalizedBase}data/${filename}`;
-      };
-
+      // Use document.baseURI to get the correct base URL
+      // This automatically includes the correct path for GitHub Pages
+      const baseUrl = new URL('.', document.baseURI);
+      
       const [nodesRes, channelsRes, edgesRes, paymentsRes, configRes] = await Promise.all([
-        fetch(getDataUrl('nodes_output.csv')),
-        fetch(getDataUrl('channels_output.csv')),
-        fetch(getDataUrl('edges_output.csv')),
-        fetch(getDataUrl('payments_output.csv')),
-        fetch(getDataUrl('cloth_input.txt')),
+        fetch(new URL('data/nodes_output.csv', baseUrl)),
+        fetch(new URL('data/channels_output.csv', baseUrl)),
+        fetch(new URL('data/edges_output.csv', baseUrl)),
+        fetch(new URL('data/payments_output.csv', baseUrl)),
+        fetch(new URL('data/cloth_input.txt', baseUrl)),
       ]);
 
       if (!nodesRes.ok || !channelsRes.ok || !edgesRes.ok || !paymentsRes.ok || !configRes.ok) {
