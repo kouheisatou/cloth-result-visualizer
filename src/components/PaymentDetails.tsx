@@ -127,7 +127,61 @@ export function PaymentDetails({
           <span className="label">残高不足:</span>
           <span className="value">{payment.noBalanceCount}回</span>
         </div>
+        {payment.isShard && payment.parentPaymentId >= 0 && (
+          <div className="summary-row">
+            <span className="label">親ペイメント:</span>
+            <span className="value shard">#{payment.parentPaymentId}</span>
+          </div>
+        )}
+        {payment.mpp === 1 && (
+          <div className="summary-row">
+            <span className="label">MPP:</span>
+            <span className="value">有効</span>
+          </div>
+        )}
       </div>
+
+      {/* Child Shards for Multipath Payments */}
+      {payment.childShards && payment.childShards.length > 0 && (
+        <div className="child-shards-section">
+          <h4>子シャード ({payment.childShards.length}件)</h4>
+          <div className="shards-list">
+            {payment.childShards.map((shard) => (
+              <div key={shard.id} className={`shard-item ${shard.isSuccess ? 'success' : 'failed'}`}>
+                <div className="shard-header">
+                  <span className="shard-id">Shard #{shard.id}</span>
+                  <span className={`shard-status ${shard.isSuccess ? 'success' : 'failed'}`}>
+                    {shard.isSuccess ? '成功' : '失敗'}
+                  </span>
+                </div>
+                <div className="shard-details">
+                  <span className="shard-amount">{formatSatoshi(shard.amount)}</span>
+                  <span className="shard-attempts">{shard.attempts}回試行</span>
+                  {shard.route.length > 0 && (
+                    <span className="shard-route">
+                      {shard.route.map((edgeId) => {
+                        const edge = edgeMap.get(edgeId);
+                        return edge ? `${edge.fromNodeId}→${edge.toNodeId}` : `E#${edgeId}`;
+                      }).join(' → ')}
+                    </span>
+                  )}
+                </div>
+                {/* Nested shards */}
+                {shard.childShards && shard.childShards.length > 0 && (
+                  <div className="nested-shards">
+                    <span className="nested-label">さらに分割: </span>
+                    {shard.childShards.map(nested => (
+                      <span key={nested.id} className={`nested-shard ${nested.isSuccess ? 'success' : 'failed'}`}>
+                        #{nested.id} ({formatSatoshi(nested.amount)})
+                      </span>
+                    ))}
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Final Route */}
       {payment.isSuccess && payment.route.length > 0 && (

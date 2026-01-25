@@ -23,6 +23,7 @@ interface PaymentConnection {
   fromPaymentId: number;
   toPaymentId: number;
   type: 'parent-child' | 'retry';
+  splitIndex?: number; // 0 for first shard, 1 for second shard
 }
 
 export function GanttChart({ payments, onPaymentSelect, selectedPaymentId }: GanttChartProps) {
@@ -50,13 +51,15 @@ export function GanttChart({ payments, onPaymentSelect, selectedPaymentId }: Gan
     return { minTime, maxTime, duration: maxTime - minTime };
   }, [payments]);
 
-  // Filter and prepare payment data
+  // Filter and prepare payment data (sorted by start time)
   const filteredPayments = useMemo(() => {
-    return payments.filter(payment => {
-      if (filterSuccess === 'all') return true;
-      if (filterSuccess === 'success') return payment.isSuccess;
-      return !payment.isSuccess;
-    });
+    return payments
+      .filter(payment => {
+        if (filterSuccess === 'all') return true;
+        if (filterSuccess === 'success') return payment.isSuccess;
+        return !payment.isSuccess;
+      })
+      .sort((a, b) => a.startTime - b.startTime);
   }, [payments, filterSuccess]);
 
   // Generate attempt bars
@@ -93,16 +96,29 @@ export function GanttChart({ payments, onPaymentSelect, selectedPaymentId }: Gan
   const connections = useMemo(() => {
     const conns: PaymentConnection[] = [];
     const paymentMap = new Map(payments.map(p => [p.id, p]));
+    const filteredSet = new Set(filteredPayments.map(p => p.id));
     
     for (const payment of filteredPayments) {
-      // Parent-child relationship (split payments)
-      if (payment.parentPaymentId >= 0) {
-        const parent = paymentMap.get(payment.parentPaymentId);
-        if (parent && filteredPayments.includes(parent)) {
+      // Parent to child relationship (split payments) - use shard1Id and shard2Id
+      if (payment.shard1Id >= 0) {
+        const shard1 = paymentMap.get(payment.shard1Id);
+        if (shard1 && filteredSet.has(shard1.id)) {
           conns.push({
-            fromPaymentId: payment.parentPaymentId,
-            toPaymentId: payment.id,
+            fromPaymentId: payment.id,
+            toPaymentId: shard1.id,
             type: 'parent-child',
+            splitIndex: 0,
+          });
+        }
+      }
+      if (payment.shard2Id >= 0) {
+        const shard2 = paymentMap.get(payment.shard2Id);
+        if (shard2 && filteredSet.has(shard2.id)) {
+          conns.push({
+            fromPaymentId: payment.id,
+            toPaymentId: shard2.id,
+            type: 'parent-child',
+            splitIndex: 1,
           });
         }
       }
@@ -257,70 +273,160 @@ export function GanttChart({ payments, onPaymentSelect, selectedPaymentId }: Gan
 
           {/* Payment labels (Y-axis) */}
           <g className="payment-labels">
-            {filteredPayments.map((payment, index) => (
-              <g key={payment.id}>
-                <rect
-                  x="0"
-                  y={headerHeight + index * rowHeight}
-                  width={labelWidth - 5}
-                  height={rowHeight}
-                  fill={selectedPaymentId === payment.id ? '#1e3a5f' : 'transparent'}
-                  onClick={() => onPaymentSelect?.(payment)}
-                  style={{ cursor: 'pointer' }}
-                />
-                <text
-                  x={labelWidth - 10}
-                  y={headerHeight + index * rowHeight + rowHeight / 2 + 4}
-                  textAnchor="end"
-                  fill={payment.isSuccess ? '#22c55e' : '#ef4444'}
-                  fontSize="12"
-                  fontFamily="monospace"
-                >
-                  #{payment.id}
-                </text>
-              </g>
-            ))}
+            {filteredPayments.map((payment, index) => {
+              const hasSplits = payment.shard1Id >= 0 || payment.shard2Id >= 0;
+              const isShard = payment.isShard;
+              
+              return (
+                <g key={payment.id}>
+                  <rect
+                    x="0"
+                    y={headerHeight + index * rowHeight}
+                    width={labelWidth - 5}
+                    height={rowHeight}
+                    fill={selectedPaymentId === payment.id ? '#1e3a5f' : 'transparent'}
+                    onClick={() => onPaymentSelect?.(payment)}
+                    style={{ cursor: 'pointer' }}
+                  />
+                  {/* Shard indicator (child payment) */}
+                  {isShard && (
+                    <>
+                      <text
+                        x={8}
+                        y={headerHeight + index * rowHeight + rowHeight / 2 + 4}
+                        fill="#8b5cf6"
+                        fontSize="10"
+                      >
+                        └
+                      </text>
+                    </>
+                  )}
+                  {/* Split indicator (parent payment) */}
+                  {hasSplits && (
+                    <polygon
+                      points={`${labelWidth - 70},${headerHeight + index * rowHeight + rowHeight / 2 - 4} ${labelWidth - 66},${headerHeight + index * rowHeight + rowHeight / 2} ${labelWidth - 70},${headerHeight + index * rowHeight + rowHeight / 2 + 4} ${labelWidth - 74},${headerHeight + index * rowHeight + rowHeight / 2}`}
+                      fill="#8b5cf6"
+                    />
+                  )}
+                  <text
+                    x={labelWidth - 10}
+                    y={headerHeight + index * rowHeight + rowHeight / 2 + 4}
+                    textAnchor="end"
+                    fill={payment.isSuccess ? '#22c55e' : '#ef4444'}
+                    fontSize="12"
+                    fontFamily="monospace"
+                  >
+                    #{payment.id}
+                  </text>
+                </g>
+              );
+            })}
           </g>
 
-          {/* Connections between related payments */}
-          {showConnections && connections.map((conn, i) => {
-            const fromRow = paymentRows.get(conn.fromPaymentId);
-            const toRow = paymentRows.get(conn.toPaymentId);
-            if (fromRow === undefined || toRow === undefined) return null;
+          {/* Connections between related payments (parent-child split) */}
+          {showConnections && (() => {
+            // Group connections by parent to draw split markers
+            const connectionsByParent = new Map<number, PaymentConnection[]>();
+            for (const conn of connections) {
+              const existing = connectionsByParent.get(conn.fromPaymentId) || [];
+              existing.push(conn);
+              connectionsByParent.set(conn.fromPaymentId, existing);
+            }
             
-            const fromPayment = payments.find(p => p.id === conn.fromPaymentId);
-            const toPayment = payments.find(p => p.id === conn.toPaymentId);
-            if (!fromPayment || !toPayment) return null;
+            const elements: React.ReactNode[] = [];
             
-            const fromY = headerHeight + fromRow * rowHeight + rowHeight / 2;
-            const toY = headerHeight + toRow * rowHeight + rowHeight / 2;
-            const fromX = timeToX(fromPayment.endTime);
-            const toX = timeToX(toPayment.startTime);
+            connectionsByParent.forEach((conns, parentId) => {
+              const parentRow = paymentRows.get(parentId);
+              const parentPayment = payments.find(p => p.id === parentId);
+              if (parentRow === undefined || !parentPayment) return;
+              
+              const parentY = headerHeight + parentRow * rowHeight + rowHeight / 2;
+              // Split point is near the start of parent payment (or slightly after)
+              const splitX = timeToX(parentPayment.startTime) + 20;
+              
+              // Draw split marker on parent
+              elements.push(
+                <g key={`split-marker-${parentId}`} className="split-marker">
+                  {/* Split point diamond marker */}
+                  <polygon
+                    points={`${splitX},${parentY - 6} ${splitX + 6},${parentY} ${splitX},${parentY + 6} ${splitX - 6},${parentY}`}
+                    fill="#8b5cf6"
+                    stroke="#a78bfa"
+                    strokeWidth="1"
+                  />
+                  {/* Vertical line from split point */}
+                  <line
+                    x1={splitX}
+                    y1={parentY + 6}
+                    x2={splitX}
+                    y2={parentY + (conns.length > 1 ? 50 : 30)}
+                    stroke="#8b5cf6"
+                    strokeWidth="2"
+                    strokeDasharray="4,2"
+                    opacity="0.7"
+                  />
+                </g>
+              );
+              
+              // Draw connections to each child shard
+              conns.forEach((conn, idx) => {
+                const toRow = paymentRows.get(conn.toPaymentId);
+                const toPayment = payments.find(p => p.id === conn.toPaymentId);
+                if (toRow === undefined || !toPayment) return;
+                
+                const toY = headerHeight + toRow * rowHeight + rowHeight / 2;
+                const toX = timeToX(toPayment.startTime);
+                
+                // Calculate curve control points
+                const startY = parentY + (idx === 0 ? -3 : 3); // Offset to separate lines
+                const controlY1 = startY + (toY - startY) * 0.3;
+                const controlY2 = toY - (toY - startY) * 0.3;
+                
+                elements.push(
+                  <g key={`connection-${conn.fromPaymentId}-${conn.toPaymentId}`} className="connection">
+                    {/* Connection path from split point to child */}
+                    <path
+                      d={`M ${splitX} ${startY} C ${splitX} ${controlY1}, ${toX - 20} ${controlY2}, ${toX} ${toY}`}
+                      stroke={conn.splitIndex === 0 ? '#8b5cf6' : '#a78bfa'}
+                      strokeWidth="2"
+                      fill="none"
+                      strokeDasharray="6,3"
+                      opacity="0.8"
+                    />
+                    {/* Arrow at child end */}
+                    <polygon
+                      points={`${toX},${toY} ${toX - 8},${toY - 4} ${toX - 8},${toY + 4}`}
+                      fill={conn.splitIndex === 0 ? '#8b5cf6' : '#a78bfa'}
+                    />
+                    {/* Child shard indicator circle */}
+                    <circle
+                      cx={toX + 2}
+                      cy={toY}
+                      r="5"
+                      fill="none"
+                      stroke={conn.splitIndex === 0 ? '#8b5cf6' : '#a78bfa'}
+                      strokeWidth="2"
+                    />
+                    {/* Shard number label */}
+                    <text
+                      x={splitX + 12}
+                      y={startY + (toY - startY) * 0.2}
+                      fill={conn.splitIndex === 0 ? '#8b5cf6' : '#a78bfa'}
+                      fontSize="9"
+                      fontWeight="bold"
+                    >
+                      S{(conn.splitIndex ?? 0) + 1}
+                    </text>
+                  </g>
+                );
+              });
+            });
             
-            const midX = (fromX + toX) / 2;
-            
-            return (
-              <g key={i} className="connection">
-                <path
-                  d={`M ${fromX} ${fromY} C ${midX} ${fromY}, ${midX} ${toY}, ${toX} ${toY}`}
-                  stroke={conn.type === 'parent-child' ? '#8b5cf6' : '#f59e0b'}
-                  strokeWidth="2"
-                  fill="none"
-                  strokeDasharray={conn.type === 'parent-child' ? '4,4' : 'none'}
-                  opacity="0.6"
-                />
-                <circle
-                  cx={toX}
-                  cy={toY}
-                  r="4"
-                  fill={conn.type === 'parent-child' ? '#8b5cf6' : '#f59e0b'}
-                />
-              </g>
-            );
-          })}
+            return elements;
+          })()}
 
           {/* Attempt bars */}
-          {attemptBars.map((attempt, i) => {
+          {attemptBars.map((attempt) => {
             const row = paymentRows.get(attempt.paymentId);
             if (row === undefined) return null;
             
@@ -448,6 +554,22 @@ export function GanttChart({ payments, onPaymentSelect, selectedPaymentId }: Gan
                 <span className="label">金額</span>
                 <span className="value amount">{hoveredAttempt.payment.amount.toLocaleString()} sats</span>
               </div>
+              {hoveredAttempt.payment.isShard && (
+                <div className="tooltip-row">
+                  <span className="label">シャード</span>
+                  <span className="value shard">親: #{hoveredAttempt.payment.parentPaymentId}</span>
+                </div>
+              )}
+              {(hoveredAttempt.payment.shard1Id >= 0 || hoveredAttempt.payment.shard2Id >= 0) && (
+                <div className="tooltip-row">
+                  <span className="label">分割先</span>
+                  <span className="value shard">
+                    {hoveredAttempt.payment.shard1Id >= 0 && `#${hoveredAttempt.payment.shard1Id}`}
+                    {hoveredAttempt.payment.shard1Id >= 0 && hoveredAttempt.payment.shard2Id >= 0 && ', '}
+                    {hoveredAttempt.payment.shard2Id >= 0 && `#${hoveredAttempt.payment.shard2Id}`}
+                  </span>
+                </div>
+              )}
             </div>
           </div>
         )}
@@ -472,8 +594,14 @@ export function GanttChart({ payments, onPaymentSelect, selectedPaymentId }: Gan
           <span>オフライン</span>
         </div>
         <div className="legend-item">
+          <svg width="14" height="14" style={{ marginRight: '4px' }}>
+            <polygon points="7,1 13,7 7,13 1,7" fill="#8b5cf6" />
+          </svg>
+          <span>分割点</span>
+        </div>
+        <div className="legend-item">
           <span className="legend-line dashed purple"></span>
-          <span>親子関係</span>
+          <span>親→子シャード</span>
         </div>
         <div className="legend-item">
           <span className="legend-line dashed orange"></span>

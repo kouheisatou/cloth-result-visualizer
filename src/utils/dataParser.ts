@@ -57,7 +57,9 @@ export function parseEdges(csv: string): Edge[] {
 // Parse payments CSV
 export function parsePayments(csv: string): Payment[] {
   const result = Papa.parse<Record<string, string>>(csv, { header: true, skipEmptyLines: true });
-  return result.data.map((row) => {
+  
+  // First pass: parse all payments
+  const payments: Payment[] = result.data.map((row) => {
     let attemptsHistory: AttemptHistory[] = [];
     
     if (row.attempts_history) {
@@ -77,19 +79,50 @@ export function parsePayments(csv: string): Payment[] {
       maxFeeLimit: parseInt(row.max_fee_limit),
       endTime: parseInt(row.end_time),
       mpp: parseInt(row.mpp),
+      isShard: row.is_shard === '1',
+      parentPaymentId: parseInt(row.parent_payment_id),
+      shard1Id: parseInt(row.shard1_id),
+      shard2Id: parseInt(row.shard2_id),
       isSuccess: row.is_success === '1',
+      isRolledBack: row.is_rolledback === '1',
       noBalanceCount: parseInt(row.no_balance_count),
       offlineNodeCount: parseInt(row.offline_node_count),
       timeoutExp: parseInt(row.timeout_exp),
       attempts: parseInt(row.attempts),
       route: row.route ? row.route.split('-').map(Number).filter(n => !isNaN(n)) : [],
       totalFee: parseInt(row.total_fee),
-      parentPaymentId: parseInt(row.parent_payment_id),
-      splitDepth: parseInt(row.split_depth),
-      isRolledBack: row.is_rolled_back === '1',
       attemptsHistory,
     };
   });
+
+  // Second pass: build parent-child relationships for multipath payments
+  const paymentMap = new Map<number, Payment>();
+  for (const payment of payments) {
+    paymentMap.set(payment.id, payment);
+  }
+
+  for (const payment of payments) {
+    if (payment.shard1Id >= 0 || payment.shard2Id >= 0) {
+      const shards: Payment[] = [];
+      if (payment.shard1Id >= 0) {
+        const shard1 = paymentMap.get(payment.shard1Id);
+        if (shard1) {
+          shards.push(shard1);
+        }
+      }
+      if (payment.shard2Id >= 0) {
+        const shard2 = paymentMap.get(payment.shard2Id);
+        if (shard2) {
+          shards.push(shard2);
+        }
+      }
+      if (shards.length > 0) {
+        payment.childShards = shards;
+      }
+    }
+  }
+
+  return payments;
 }
 
 // Parse simulation config

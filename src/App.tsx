@@ -5,6 +5,7 @@ import { TimelineControl } from './components/TimelineControl';
 import { PaymentDetails } from './components/PaymentDetails';
 import { StatsPanel } from './components/StatsPanel';
 import { GanttChart } from './components/GanttChart';
+import { PaymentTree } from './components/PaymentTree';
 import { 
   parseNodes, 
   parseChannels, 
@@ -16,7 +17,7 @@ import {
 import type { Node, Channel, Edge, Payment, SimulationConfig, TimelineEvent } from './types';
 import './App.css';
 
-type ViewMode = 'network' | 'gantt';
+type ViewMode = 'network' | 'gantt' | 'tree';
 
 interface SimulationData {
   nodes: Node[];
@@ -105,6 +106,12 @@ function App() {
             >
               ガントチャート
             </button>
+            <button 
+              className={`view-btn ${viewMode === 'tree' ? 'active' : ''}`}
+              onClick={() => setViewMode('tree')}
+            >
+              MPP分割ツリー
+            </button>
           </div>
           {viewMode === 'network' && (
             <button onClick={() => setShowStats(!showStats)} className="toggle-stats">
@@ -151,7 +158,7 @@ function App() {
             />
           </div>
         </main>
-      ) : (
+      ) : viewMode === 'gantt' ? (
         <main className="app-main gantt-view">
           <div className="gantt-main-panel">
             <GanttChart 
@@ -161,6 +168,24 @@ function App() {
             />
           </div>
           <div className="gantt-side-panel">
+            <PaymentDetails
+              payment={selectedPayment}
+              edges={data.edges}
+              onAttemptSelect={handleAttemptSelect}
+              selectedAttemptIndex={selectedAttemptIndex}
+            />
+          </div>
+        </main>
+      ) : (
+        <main className="app-main tree-view">
+          <div className="tree-main-panel">
+            <PaymentTree 
+              payments={data.payments}
+              onPaymentSelect={handlePaymentSelect}
+              selectedPaymentId={selectedPayment?.id}
+            />
+          </div>
+          <div className="tree-side-panel">
             <PaymentDetails
               payment={selectedPayment}
               edges={data.edges}

@@ -53,13 +53,6 @@ export interface AttemptHistory {
   end_time: number;
   error_edge: number;
   error_type: number;
-  split_depth: number;
-  split_occurred: number;
-  split_reason: string | null;
-  child_shard_id1: number | null;
-  child_shard_id2: number | null;
-  child_shard_amount1: number | null;
-  child_shard_amount2: number | null;
   route: RouteHop[];
 }
 
@@ -73,17 +66,21 @@ export interface Payment {
   maxFeeLimit: number;
   endTime: number;
   mpp: number;
+  isShard: boolean;
+  parentPaymentId: number;
+  shard1Id: number;
+  shard2Id: number;
   isSuccess: boolean;
+  isRolledBack: boolean;
   noBalanceCount: number;
   offlineNodeCount: number;
   timeoutExp: number;
   attempts: number;
   route: number[]; // edge IDs
   totalFee: number;
-  parentPaymentId: number;
-  splitDepth: number;
-  isRolledBack: boolean;
   attemptsHistory: AttemptHistory[];
+  // Helper fields for multipath payment tree structure
+  childShards?: Payment[];
 }
 
 // Simulation config

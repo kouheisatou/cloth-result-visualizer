@@ -838,6 +838,153 @@ body {
   font-size: 0.8rem;
 }
 
+/* Multipath Payment / Child Shards */
+.summary-row .shard {
+  color: var(--accent-purple);
+}
+
+.child-shards-section {
+  margin-bottom: 1rem;
+  padding: 0.75rem;
+  background: var(--bg-tertiary);
+  border-radius: 8px;
+  border: 1px solid var(--border-color);
+}
+
+.child-shards-section h4 {
+  font-size: 0.85rem;
+  color: var(--accent-purple);
+  margin-bottom: 0.5rem;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.child-shards-section h4::before {
+  content: '⚡';
+}
+
+.shards-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.shard-item {
+  padding: 0.6rem;
+  background: var(--bg-card);
+  border-radius: 6px;
+  border-left: 3px solid var(--accent-purple);
+}
+
+.shard-item.success {
+  border-left-color: var(--accent-green);
+}
+
+.shard-item.failed {
+  border-left-color: var(--accent-red);
+}
+
+.shard-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 0.4rem;
+}
+
+.shard-id {
+  font-size: 0.8rem;
+  font-weight: 600;
+  font-family: var(--font-mono);
+}
+
+.shard-status {
+  font-size: 0.7rem;
+  padding: 0.15rem 0.4rem;
+  border-radius: 3px;
+}
+
+.shard-status.success {
+  background: rgba(34, 197, 94, 0.2);
+  color: var(--accent-green);
+}
+
+.shard-status.failed {
+  background: rgba(239, 68, 68, 0.2);
+  color: var(--accent-red);
+}
+
+.shard-details {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+}
+
+.shard-amount {
+  color: var(--accent-yellow);
+  font-family: var(--font-mono);
+}
+
+.shard-attempts {
+  color: var(--text-muted);
+}
+
+.shard-route {
+  font-family: var(--font-mono);
+  color: var(--accent-cyan);
+  font-size: 0.7rem;
+}
+
+.nested-shards {
+  margin-top: 0.4rem;
+  padding-top: 0.4rem;
+  border-top: 1px dashed var(--border-color);
+  font-size: 0.7rem;
+}
+
+.nested-label {
+  color: var(--text-muted);
+}
+
+.nested-shard {
+  display: inline-block;
+  margin-left: 0.4rem;
+  padding: 0.15rem 0.3rem;
+  background: var(--bg-tertiary);
+  border-radius: 3px;
+  font-family: var(--font-mono);
+}
+
+.nested-shard.success {
+  color: var(--accent-green);
+}
+
+.nested-shard.failed {
+  color: var(--accent-red);
+}
+
+/* MPP Stats Section */
+.mpp-stats {
+  margin-top: 1rem;
+  padding-top: 1rem;
+  border-top: 1px solid var(--border-color);
+}
+
+.mpp-stats h4 {
+  font-size: 0.8rem;
+  color: var(--accent-purple);
+  margin-bottom: 0.5rem;
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.mpp-stats h4::before {
+  content: '⚡';
+}
+
 /* Scrollbar */
 ::-webkit-scrollbar {
   width: 8px;
@@ -861,6 +1008,24 @@ body {
 /* Gantt View Layout */
 .app-main.gantt-view {
   grid-template-columns: 1fr 360px;
+}
+
+/* Tree View Layout */
+.app-main.tree-view {
+  grid-template-columns: 1fr 360px;
+}
+
+.tree-main-panel {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.tree-side-panel {
+  display: flex;
+  flex-direction: column;
+  overflow-y: auto;
 }
 
 .gantt-main-panel {
@@ -1047,6 +1212,10 @@ body {
   color: var(--accent-yellow);
 }
 
+.tooltip-row .value.shard {
+  color: var(--accent-purple);
+}
+
 /* Gantt Legend */
 .gantt-legend {
   display: flex;
@@ -1138,5 +1307,18 @@ body {
 
   .gantt-controls {
     flex-wrap: wrap;
+  }
+
+  .app-main.tree-view {
+    grid-template-columns: 1fr;
+    grid-template-rows: 1fr auto;
+  }
+
+  .tree-main-panel {
+    min-height: 400px;
+  }
+
+  .tree-side-panel {
+    max-height: 300px;
   }
 }

@@ -7,25 +7,36 @@ interface StatsPanelProps {
 }
 
 export function StatsPanel({ payments, config }: StatsPanelProps) {
+  // Separate root payments (non-shards) from shards
+  const rootPayments = payments.filter(p => !p.isShard);
+  const shardPayments = payments.filter(p => p.isShard);
+  
   const successfulPayments = payments.filter(p => p.isSuccess);
-  const failedPayments = payments.filter(p => !p.isSuccess);
+  const successfulRootPayments = rootPayments.filter(p => p.isSuccess);
   
   const successRate = payments.length > 0 
     ? (successfulPayments.length / payments.length * 100).toFixed(1)
     : '0';
 
-  const totalAmount = successfulPayments.reduce((sum, p) => sum + p.amount, 0);
+  const rootSuccessRate = rootPayments.length > 0
+    ? (successfulRootPayments.length / rootPayments.length * 100).toFixed(1)
+    : '0';
+
+  const totalAmount = successfulRootPayments.reduce((sum, p) => sum + p.amount, 0);
   const totalFees = successfulPayments.reduce((sum, p) => sum + p.totalFee, 0);
   const avgAttempts = payments.length > 0
     ? (payments.reduce((sum, p) => sum + p.attempts, 0) / payments.length).toFixed(2)
     : '0';
 
-  const avgDuration = successfulPayments.length > 0
-    ? successfulPayments.reduce((sum, p) => sum + (p.endTime - p.startTime), 0) / successfulPayments.length
+  const avgDuration = successfulRootPayments.length > 0
+    ? successfulRootPayments.reduce((sum, p) => sum + (p.endTime - p.startTime), 0) / successfulRootPayments.length
     : 0;
 
   const noBalanceErrors = payments.reduce((sum, p) => sum + p.noBalanceCount, 0);
   const offlineErrors = payments.reduce((sum, p) => sum + p.offlineNodeCount, 0);
+
+  // Count payments that were split into multiple shards
+  const splitPayments = rootPayments.filter(p => p.childShards && p.childShards.length > 0);
 
   return (
     <div className="stats-panel">
@@ -34,22 +45,22 @@ export function StatsPanel({ payments, config }: StatsPanelProps) {
       <div className="stats-grid">
         <div className="stat-item">
           <span className="stat-label">総ペイメント数</span>
-          <span className="stat-value">{payments.length}</span>
+          <span className="stat-value">{rootPayments.length}</span>
         </div>
         
         <div className="stat-item success">
           <span className="stat-label">成功</span>
-          <span className="stat-value">{successfulPayments.length}</span>
+          <span className="stat-value">{successfulRootPayments.length}</span>
         </div>
         
         <div className="stat-item failed">
           <span className="stat-label">失敗</span>
-          <span className="stat-value">{failedPayments.length}</span>
+          <span className="stat-value">{rootPayments.length - successfulRootPayments.length}</span>
         </div>
         
         <div className="stat-item">
           <span className="stat-label">成功率</span>
-          <span className="stat-value">{successRate}%</span>
+          <span className="stat-value">{rootSuccessRate}%</span>
         </div>
         
         <div className="stat-item">
@@ -82,6 +93,35 @@ export function StatsPanel({ payments, config }: StatsPanelProps) {
           <span className="stat-value">{offlineErrors}</span>
         </div>
       </div>
+
+      {/* Multipath Payment Stats */}
+      {shardPayments.length > 0 && (
+        <div className="mpp-stats">
+          <h4>マルチパスペイメント統計</h4>
+          <div className="stats-grid">
+            <div className="stat-item">
+              <span className="stat-label">分割されたペイメント</span>
+              <span className="stat-value">{splitPayments.length}</span>
+            </div>
+            <div className="stat-item">
+              <span className="stat-label">総シャード数</span>
+              <span className="stat-value">{shardPayments.length}</span>
+            </div>
+            <div className="stat-item">
+              <span className="stat-label">シャード成功率</span>
+              <span className="stat-value">
+                {shardPayments.length > 0 
+                  ? (shardPayments.filter(p => p.isSuccess).length / shardPayments.length * 100).toFixed(1)
+                  : '0'}%
+              </span>
+            </div>
+            <div className="stat-item">
+              <span className="stat-label">全体成功率(シャード込)</span>
+              <span className="stat-value">{successRate}%</span>
+            </div>
+          </div>
+        </div>
+      )}
 
       {config && (
         <div className="config-info">
