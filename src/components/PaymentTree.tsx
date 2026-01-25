@@ -32,8 +32,6 @@ export function PaymentTree({ payments, onPaymentSelect, selectedPaymentId }: Pa
   const [searchQuery, setSearchQuery] = useState('');
   const [amountMin, setAmountMin] = useState('');
   const [amountMax, setAmountMax] = useState('');
-  const [page, setPage] = useState(0);
-  const pageSize = 50;
 
   // Create payment map for quick lookup
   const paymentMap = useMemo(() => {
@@ -163,14 +161,6 @@ export function PaymentTree({ payments, onPaymentSelect, selectedPaymentId }: Pa
     return sorted;
   }, [filteredPayments, sortField, sortOrder]);
 
-  // Paginate
-  const paginatedPayments = useMemo(() => {
-    const start = page * pageSize;
-    return sortedPayments.slice(start, start + pageSize);
-  }, [sortedPayments, page, pageSize]);
-
-  const totalPages = Math.ceil(sortedPayments.length / pageSize);
-
   // Stats
   const stats = useMemo(() => {
     const total = rootPayments.length;
@@ -211,7 +201,6 @@ export function PaymentTree({ payments, onPaymentSelect, selectedPaymentId }: Pa
     setSearchQuery('');
     setAmountMin('');
     setAmountMax('');
-    setPage(0);
   }, []);
 
   // Count success/fail in tree for MPP payments
@@ -420,7 +409,7 @@ export function PaymentTree({ payments, onPaymentSelect, selectedPaymentId }: Pa
               type="text" 
               placeholder="ID / 送信者 / 受信者"
               value={searchQuery}
-              onChange={(e) => { setSearchQuery(e.target.value); setPage(0); }}
+              onChange={(e) => setSearchQuery(e.target.value)}
               className="search-input"
             />
           </div>
@@ -429,7 +418,7 @@ export function PaymentTree({ payments, onPaymentSelect, selectedPaymentId }: Pa
             <label>ステータス:</label>
             <select 
               value={statusFilter} 
-              onChange={(e) => { setStatusFilter(e.target.value as StatusFilter); setPage(0); }}
+              onChange={(e) => setStatusFilter(e.target.value as StatusFilter)}
             >
               <option value="all">すべて</option>
               <option value="success">成功のみ</option>
@@ -441,7 +430,7 @@ export function PaymentTree({ payments, onPaymentSelect, selectedPaymentId }: Pa
             <label>タイプ:</label>
             <select 
               value={typeFilter} 
-              onChange={(e) => { setTypeFilter(e.target.value as TypeFilter); setPage(0); }}
+              onChange={(e) => setTypeFilter(e.target.value as TypeFilter)}
             >
               <option value="all">すべて</option>
               <option value="mpp">MPPのみ</option>
@@ -457,7 +446,7 @@ export function PaymentTree({ payments, onPaymentSelect, selectedPaymentId }: Pa
               type="number" 
               placeholder="最小"
               value={amountMin}
-              onChange={(e) => { setAmountMin(e.target.value); setPage(0); }}
+              onChange={(e) => setAmountMin(e.target.value)}
               className="amount-input"
             />
             <span className="range-separator">〜</span>
@@ -465,7 +454,7 @@ export function PaymentTree({ payments, onPaymentSelect, selectedPaymentId }: Pa
               type="number" 
               placeholder="最大"
               value={amountMax}
-              onChange={(e) => { setAmountMax(e.target.value); setPage(0); }}
+              onChange={(e) => setAmountMax(e.target.value)}
               className="amount-input"
             />
           </div>
@@ -477,7 +466,7 @@ export function PaymentTree({ payments, onPaymentSelect, selectedPaymentId }: Pa
       </div>
 
       <div className="list-info">
-        <span>表示: {sortedPayments.length}件中 {page * pageSize + 1}〜{Math.min((page + 1) * pageSize, sortedPayments.length)}件</span>
+        <span>表示: {sortedPayments.length}件</span>
       </div>
 
       <div className="list-table">
@@ -494,54 +483,15 @@ export function PaymentTree({ payments, onPaymentSelect, selectedPaymentId }: Pa
         </div>
 
         <div className="table-body">
-          {paginatedPayments.length === 0 ? (
+          {sortedPayments.length === 0 ? (
             <div className="empty-list">
               <p>条件に一致するペイメントがありません</p>
             </div>
           ) : (
-            paginatedPayments.map(payment => renderPaymentRow(payment))
+            sortedPayments.map(payment => renderPaymentRow(payment))
           )}
         </div>
       </div>
-
-      {/* Pagination */}
-      {totalPages > 1 && (
-        <div className="pagination">
-          <button 
-            onClick={() => setPage(0)} 
-            disabled={page === 0}
-            className="page-btn"
-          >
-            «
-          </button>
-          <button 
-            onClick={() => setPage(p => Math.max(0, p - 1))} 
-            disabled={page === 0}
-            className="page-btn"
-          >
-            ‹
-          </button>
-          
-          <span className="page-info">
-            {page + 1} / {totalPages}
-          </span>
-          
-          <button 
-            onClick={() => setPage(p => Math.min(totalPages - 1, p + 1))} 
-            disabled={page >= totalPages - 1}
-            className="page-btn"
-          >
-            ›
-          </button>
-          <button 
-            onClick={() => setPage(totalPages - 1)} 
-            disabled={page >= totalPages - 1}
-            className="page-btn"
-          >
-            »
-          </button>
-        </div>
-      )}
     </div>
   );
 }

@@ -87,6 +87,10 @@ function App() {
   const handlePaymentSelect = useCallback((payment: Payment | null) => {
     setSelectedPayment(payment);
     setSelectedAttemptIndex(undefined);
+    // Clear node/channel/edge selection when payment is selected
+    setSelectedNodeId(null);
+    setSelectedChannelId(null);
+    setSelectedEdgeId(null);
   }, []);
 
   const handleAttemptSelect = useCallback((attemptIndex: number) => {
@@ -133,6 +137,9 @@ function App() {
     setSelectedNodeId(nodeId);
     setSelectedChannelId(null);
     setSelectedEdgeId(null);
+    // Clear payment selection when node is selected
+    setSelectedPayment(null);
+    setSelectedAttemptIndex(undefined);
   }, []);
 
   // Handler for network graph edge click - converts edge to channel
@@ -143,8 +150,36 @@ function App() {
       setSelectedChannelId(edge.channelId);
       setSelectedEdgeId(edgeId);
       setSelectedNodeId(null);
+      // Clear payment selection when edge is selected
+      setSelectedPayment(null);
+      setSelectedAttemptIndex(undefined);
     }
   }, [data]);
+
+  // Handlers for network view right panel navigation
+  const handleNetworkPanelNodeClick = useCallback((nodeId: number) => {
+    setSelectedNodeId(nodeId);
+    setSelectedChannelId(null);
+    setSelectedEdgeId(null);
+    setSelectedPayment(null);
+    setSelectedAttemptIndex(undefined);
+  }, []);
+
+  const handleNetworkPanelChannelClick = useCallback((channelId: number) => {
+    setSelectedChannelId(channelId);
+    setSelectedNodeId(null);
+    setSelectedEdgeId(null);
+    setSelectedPayment(null);
+    setSelectedAttemptIndex(undefined);
+  }, []);
+
+  const handleNetworkPanelEdgeClick = useCallback((edgeId: number) => {
+    setSelectedEdgeId(edgeId);
+    setSelectedNodeId(null);
+    setSelectedChannelId(null);
+    setSelectedPayment(null);
+    setSelectedAttemptIndex(undefined);
+  }, []);
 
   if (!data) {
     return <DataLoader onDataLoaded={handleDataLoaded} />;
@@ -256,16 +291,8 @@ function App() {
                 edges={data.edges}
                 channels={data.channels}
                 payments={data.payments}
-                onEdgeClick={(edgeId) => {
-                  setSelectedEdgeId(edgeId);
-                  setSelectedNodeId(null);
-                  setSelectedChannelId(null);
-                }}
-                onChannelClick={(channelId) => {
-                  setSelectedChannelId(channelId);
-                  setSelectedNodeId(null);
-                  setSelectedEdgeId(null);
-                }}
+                onEdgeClick={handleNetworkPanelEdgeClick}
+                onChannelClick={handleNetworkPanelChannelClick}
               />
             ) : selectedChannelId !== null ? (
               <ChannelDetail
@@ -273,16 +300,8 @@ function App() {
                 channels={data.channels}
                 edges={data.edges}
                 payments={data.payments}
-                onNodeClick={(nodeId) => {
-                  setSelectedNodeId(nodeId);
-                  setSelectedChannelId(null);
-                  setSelectedEdgeId(null);
-                }}
-                onEdgeClick={(edgeId) => {
-                  setSelectedEdgeId(edgeId);
-                  setSelectedChannelId(null);
-                  setSelectedNodeId(null);
-                }}
+                onNodeClick={handleNetworkPanelNodeClick}
+                onEdgeClick={handleNetworkPanelEdgeClick}
               />
             ) : selectedEdgeId !== null ? (
               <EdgeDetail
@@ -290,16 +309,8 @@ function App() {
                 edges={data.edges}
                 channels={data.channels}
                 payments={data.payments}
-                onNodeClick={(nodeId) => {
-                  setSelectedNodeId(nodeId);
-                  setSelectedEdgeId(null);
-                  setSelectedChannelId(null);
-                }}
-                onChannelClick={(channelId) => {
-                  setSelectedChannelId(channelId);
-                  setSelectedEdgeId(null);
-                  setSelectedNodeId(null);
-                }}
+                onNodeClick={handleNetworkPanelNodeClick}
+                onChannelClick={handleNetworkPanelChannelClick}
               />
             ) : (
               <PaymentDetails
