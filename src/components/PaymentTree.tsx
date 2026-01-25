@@ -33,63 +33,93 @@ export function PaymentTree({ payments, onPaymentSelect, selectedPaymentId }: Pa
   const [amountMin, setAmountMin] = useState('');
   const [amountMax, setAmountMax] = useState('');
 
-  // Create payment map for quick lookup
-  const paymentMap = useMemo(() => {
-    const map = new Map<number, Payment>();
+  // Pre-process all data on initial load (memoized by payments reference)
+  const preprocessedData = useMemo(() => {
+    // Create payment map for quick lookup
+    const paymentMap = new Map<number, Payment>();
     for (const payment of payments) {
-      map.set(payment.id, payment);
+      paymentMap.set(payment.id, payment);
     }
-    return map;
-  }, [payments]);
 
-  // Build tree structure recursively
-  const buildTree = useCallback((payment: Payment, depth: number): TreeNode => {
-    const children: TreeNode[] = [];
-    let totalLeafAmount = 0;
-    let leafCount = 0;
-
-    if (payment.shard1Id >= 0) {
-      const shard1 = paymentMap.get(payment.shard1Id);
-      if (shard1) {
-        const childTree = buildTree(shard1, depth + 1);
-        children.push(childTree);
-        totalLeafAmount += childTree.totalLeafAmount;
-        leafCount += childTree.leafCount;
+    // Build tree structure recursively
+    const buildTree = (payment: Payment, depth: number, cache: Map<number, TreeNode>): TreeNode => {
+      // Check cache first
+      if (cache.has(payment.id)) {
+        return cache.get(payment.id)!;
       }
-    }
 
-    if (payment.shard2Id >= 0) {
-      const shard2 = paymentMap.get(payment.shard2Id);
-      if (shard2) {
-        const childTree = buildTree(shard2, depth + 1);
-        children.push(childTree);
-        totalLeafAmount += childTree.totalLeafAmount;
-        leafCount += childTree.leafCount;
+      const children: TreeNode[] = [];
+      let totalLeafAmount = 0;
+      let leafCount = 0;
+
+      if (payment.shard1Id >= 0) {
+        const shard1 = paymentMap.get(payment.shard1Id);
+        if (shard1) {
+          const childTree = buildTree(shard1, depth + 1, cache);
+          children.push(childTree);
+          totalLeafAmount += childTree.totalLeafAmount;
+          leafCount += childTree.leafCount;
+        }
       }
+
+      if (payment.shard2Id >= 0) {
+        const shard2 = paymentMap.get(payment.shard2Id);
+        if (shard2) {
+          const childTree = buildTree(shard2, depth + 1, cache);
+          children.push(childTree);
+          totalLeafAmount += childTree.totalLeafAmount;
+          leafCount += childTree.leafCount;
+        }
+      }
+
+      // If no children, this is a leaf node
+      if (children.length === 0) {
+        totalLeafAmount = payment.amount;
+        leafCount = 1;
+      }
+
+      const node: TreeNode = {
+        payment,
+        children,
+        depth,
+        totalLeafAmount,
+        leafCount,
+      };
+
+      cache.set(payment.id, node);
+      return node;
+    };
+
+    // Build tree cache for all payments
+    const treeCache = new Map<number, TreeNode>();
+    const rootPayments = payments.filter(p => !p.isShard);
+
+    // Pre-build all trees
+    for (const payment of rootPayments) {
+      buildTree(payment, 0, treeCache);
     }
 
-    // If no children, this is a leaf node
-    if (children.length === 0) {
-      totalLeafAmount = payment.amount;
-      leafCount = 1;
-    }
+    // Calculate stats
+    const total = rootPayments.length;
+    const successful = rootPayments.filter(p => p.isSuccess).length;
+    const failed = total - successful;
+    const mppPayments = rootPayments.filter(p => p.shard1Id >= 0 || p.shard2Id >= 0).length;
+    const singlePayments = total - mppPayments;
+    const totalAmount = rootPayments.reduce((sum, p) => sum + p.amount, 0);
+    const avgAmount = total > 0 ? totalAmount / total : 0;
 
     return {
-      payment,
-      children,
-      depth,
-      totalLeafAmount,
-      leafCount,
+      paymentMap,
+      treeCache,
+      rootPayments,
+      stats: { total, successful, failed, mppPayments, singlePayments, totalAmount, avgAmount }
     };
-  }, [paymentMap]);
-
-  // Get root payments (exclude shards from top-level list)
-  const rootPayments = useMemo(() => {
-    return payments.filter(p => !p.isShard);
   }, [payments]);
 
-  // Apply filters
+  // Apply filters (using preprocessed data)
   const filteredPayments = useMemo(() => {
+    const { rootPayments } = preprocessedData;
+    
     return rootPayments.filter(payment => {
       // Status filter
       if (statusFilter === 'success' && !payment.isSuccess) return false;
@@ -122,7 +152,7 @@ export function PaymentTree({ payments, onPaymentSelect, selectedPaymentId }: Pa
 
       return true;
     });
-  }, [rootPayments, statusFilter, typeFilter, searchQuery, amountMin, amountMax]);
+  }, [preprocessedData, statusFilter, typeFilter, searchQuery, amountMin, amountMax]);
 
   // Sort payments
   const sortedPayments = useMemo(() => {
@@ -161,18 +191,8 @@ export function PaymentTree({ payments, onPaymentSelect, selectedPaymentId }: Pa
     return sorted;
   }, [filteredPayments, sortField, sortOrder]);
 
-  // Stats
-  const stats = useMemo(() => {
-    const total = rootPayments.length;
-    const successful = rootPayments.filter(p => p.isSuccess).length;
-    const failed = total - successful;
-    const mppPayments = rootPayments.filter(p => p.shard1Id >= 0 || p.shard2Id >= 0).length;
-    const singlePayments = total - mppPayments;
-    const totalAmount = rootPayments.reduce((sum, p) => sum + p.amount, 0);
-    const avgAmount = total > 0 ? totalAmount / total : 0;
-
-    return { total, successful, failed, mppPayments, singlePayments, totalAmount, avgAmount };
-  }, [rootPayments]);
+  // Use pre-calculated stats
+  const stats = preprocessedData.stats;
 
   const toggleExpand = useCallback((paymentId: number) => {
     setExpandedNodes(prev => {
@@ -273,7 +293,7 @@ export function PaymentTree({ payments, onPaymentSelect, selectedPaymentId }: Pa
     );
   };
 
-  // Render payment row
+  // Render payment row (using cached tree data)
   const renderPaymentRow = (payment: Payment) => {
     const hasMpp = payment.shard1Id >= 0 || payment.shard2Id >= 0;
     const isExpanded = expandedNodes.has(payment.id);
@@ -284,8 +304,11 @@ export function PaymentTree({ payments, onPaymentSelect, selectedPaymentId }: Pa
     let treeStatus: { success: number; fail: number } | null = null;
     
     if (hasMpp) {
-      treeNode = buildTree(payment, 0);
-      treeStatus = countTreeStatus(treeNode);
+      // Use cached tree node instead of rebuilding
+      treeNode = preprocessedData.treeCache.get(payment.id) || null;
+      if (treeNode) {
+        treeStatus = countTreeStatus(treeNode);
+      }
     }
 
     return (

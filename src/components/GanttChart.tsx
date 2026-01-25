@@ -34,8 +34,9 @@ export function GanttChart({ payments, onPaymentSelect, selectedPaymentId }: Gan
   const [filterSuccess, setFilterSuccess] = useState<'all' | 'success' | 'failed'>('all');
   const [showConnections, setShowConnections] = useState(true);
 
-  // Calculate time range
-  const timeRange = useMemo(() => {
+  // Pre-process all data on initial load
+  const preprocessedData = useMemo(() => {
+    // Calculate time range
     let minTime = Infinity;
     let maxTime = -Infinity;
     
@@ -48,30 +49,23 @@ export function GanttChart({ payments, onPaymentSelect, selectedPaymentId }: Gan
       }
     }
     
-    return { minTime, maxTime, duration: maxTime - minTime };
-  }, [payments]);
+    const timeRange = { minTime, maxTime, duration: maxTime - minTime };
 
-  // Filter and prepare payment data (sorted by start time)
-  const filteredPayments = useMemo(() => {
-    return payments
-      .filter(payment => {
-        if (filterSuccess === 'all') return true;
-        if (filterSuccess === 'success') return payment.isSuccess;
-        return !payment.isSuccess;
-      })
-      .sort((a, b) => a.startTime - b.startTime);
-  }, [payments, filterSuccess]);
+    // Sort payments by start time
+    const sortedPayments = [...payments].sort((a, b) => a.startTime - b.startTime);
 
-  // Generate attempt bars
-  const attemptBars = useMemo(() => {
-    const bars: AttemptBar[] = [];
+    // Create payment map
+    const paymentMap = new Map(payments.map(p => [p.id, p]));
+
+    // Pre-generate all attempt bars
+    const allAttemptBars = new Map<number, AttemptBar[]>();
     
-    for (const payment of filteredPayments) {
+    for (const payment of sortedPayments) {
+      const bars: AttemptBar[] = [];
       let previousEndTime = payment.startTime;
       
       for (let i = 0; i < payment.attemptsHistory.length; i++) {
         const attempt = payment.attemptsHistory[i];
-        // Estimate start time: use previous attempt's end time or payment start time
         const startTime = i === 0 ? payment.startTime : previousEndTime;
         
         bars.push({
@@ -87,21 +81,48 @@ export function GanttChart({ payments, onPaymentSelect, selectedPaymentId }: Gan
         
         previousEndTime = attempt.end_time;
       }
+      
+      allAttemptBars.set(payment.id, bars);
     }
-    
+
+    return {
+      timeRange,
+      sortedPayments,
+      paymentMap,
+      allAttemptBars
+    };
+  }, [payments]);
+
+  // Filter payments based on current filter
+  const filteredPayments = useMemo(() => {
+    return preprocessedData.sortedPayments.filter(payment => {
+      if (filterSuccess === 'all') return true;
+      if (filterSuccess === 'success') return payment.isSuccess;
+      return !payment.isSuccess;
+    });
+  }, [preprocessedData, filterSuccess]);
+
+  // Get attempt bars for filtered payments
+  const attemptBars = useMemo(() => {
+    const bars: AttemptBar[] = [];
+    for (const payment of filteredPayments) {
+      const paymentBars = preprocessedData.allAttemptBars.get(payment.id);
+      if (paymentBars) {
+        bars.push(...paymentBars);
+      }
+    }
     return bars;
-  }, [filteredPayments]);
+  }, [preprocessedData, filteredPayments]);
 
   // Generate connections between related payments
   const connections = useMemo(() => {
     const conns: PaymentConnection[] = [];
-    const paymentMap = new Map(payments.map(p => [p.id, p]));
     const filteredSet = new Set(filteredPayments.map(p => p.id));
     
     for (const payment of filteredPayments) {
-      // Parent to child relationship (split payments) - use shard1Id and shard2Id
+      // Parent to child relationship (split payments)
       if (payment.shard1Id >= 0) {
-        const shard1 = paymentMap.get(payment.shard1Id);
+        const shard1 = preprocessedData.paymentMap.get(payment.shard1Id);
         if (shard1 && filteredSet.has(shard1.id)) {
           conns.push({
             fromPaymentId: payment.id,
@@ -112,7 +133,7 @@ export function GanttChart({ payments, onPaymentSelect, selectedPaymentId }: Gan
         }
       }
       if (payment.shard2Id >= 0) {
-        const shard2 = paymentMap.get(payment.shard2Id);
+        const shard2 = preprocessedData.paymentMap.get(payment.shard2Id);
         if (shard2 && filteredSet.has(shard2.id)) {
           conns.push({
             fromPaymentId: payment.id,
@@ -125,7 +146,7 @@ export function GanttChart({ payments, onPaymentSelect, selectedPaymentId }: Gan
     }
     
     return conns;
-  }, [payments, filteredPayments]);
+  }, [preprocessedData, filteredPayments]);
 
   // Group payments by row (for y-axis positioning)
   const paymentRows = useMemo(() => {
@@ -135,6 +156,8 @@ export function GanttChart({ payments, onPaymentSelect, selectedPaymentId }: Gan
     });
     return rows;
   }, [filteredPayments]);
+
+  const timeRange = preprocessedData.timeRange;
 
   // Chart dimensions
   const chartWidth = Math.max(2000 * zoom, 800);
