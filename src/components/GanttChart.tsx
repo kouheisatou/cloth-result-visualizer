@@ -1,6 +1,6 @@
 import { useMemo, useState, useRef } from 'react';
 import type { Payment, AttemptHistory } from '../types';
-import { formatTime } from '../utils/dataParser';
+import { formatTime, formatSatoshi } from '../utils/dataParser';
 
 interface GanttChartProps {
   payments: Payment[];
@@ -552,7 +552,7 @@ export function GanttChart({ payments, onPaymentSelect, selectedPaymentId }: Gan
               </div>
               <div className="tooltip-row">
                 <span className="label">金額</span>
-                <span className="value amount">{hoveredAttempt.payment.amount.toLocaleString()} sats</span>
+                <span className="value amount">{formatSatoshi(hoveredAttempt.payment.amount)}</span>
               </div>
               {hoveredAttempt.payment.isShard && (
                 <div className="tooltip-row">

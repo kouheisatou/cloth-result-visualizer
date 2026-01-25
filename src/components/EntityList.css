@@ -1,0 +1,244 @@
+/* Entity List Common Styles */
+.entity-list {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  background: var(--bg-card);
+  border-radius: 12px;
+  border: 1px solid var(--border-color);
+  overflow: hidden;
+}
+
+.entity-list-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 1rem;
+  border-bottom: 1px solid var(--border-color);
+  background: var(--bg-tertiary);
+}
+
+.entity-list-header h3 {
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.entity-count {
+  font-size: 0.85rem;
+  color: var(--text-muted);
+  font-family: var(--font-mono);
+}
+
+.entity-list-controls {
+  display: flex;
+  gap: 0.5rem;
+  padding: 0.75rem 1rem;
+  border-bottom: 1px solid var(--border-color);
+  flex-wrap: wrap;
+}
+
+.search-input {
+  flex: 1;
+  min-width: 150px;
+  padding: 0.5rem 0.75rem;
+  border-radius: 6px;
+  border: 1px solid var(--border-color);
+  background: var(--bg-tertiary);
+  color: var(--text-primary);
+  font-size: 0.85rem;
+}
+
+.search-input:focus {
+  outline: none;
+  border-color: var(--accent-blue);
+}
+
+.search-input::placeholder {
+  color: var(--text-muted);
+}
+
+.filter-controls,
+.sort-controls {
+  display: flex;
+  gap: 0.25rem;
+}
+
+.filter-controls select,
+.sort-controls select {
+  padding: 0.5rem 0.75rem;
+  border-radius: 6px;
+  border: 1px solid var(--border-color);
+  background: var(--bg-tertiary);
+  color: var(--text-primary);
+  font-size: 0.8rem;
+  cursor: pointer;
+}
+
+.sort-order-btn {
+  padding: 0.5rem 0.75rem;
+  border-radius: 6px;
+  border: 1px solid var(--border-color);
+  background: var(--bg-tertiary);
+  color: var(--text-primary);
+  font-size: 0.9rem;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.sort-order-btn:hover {
+  background: var(--bg-secondary);
+  border-color: var(--accent-blue);
+}
+
+.entity-list-content {
+  flex: 1;
+  overflow-y: auto;
+  padding: 0.5rem;
+}
+
+.entity-item {
+  padding: 0.75rem;
+  border-radius: 8px;
+  border: 1px solid transparent;
+  background: var(--bg-tertiary);
+  margin-bottom: 0.5rem;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.entity-item:hover {
+  background: var(--bg-secondary);
+  border-color: var(--border-color);
+}
+
+.entity-item.selected {
+  background: var(--bg-secondary);
+  border-color: var(--accent-blue);
+}
+
+.entity-item.closed {
+  opacity: 0.7;
+}
+
+.entity-item-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 0.5rem;
+}
+
+.entity-id {
+  font-weight: 600;
+  font-family: var(--font-mono);
+  color: var(--accent-cyan);
+  font-size: 0.9rem;
+}
+
+.success-badge {
+  font-size: 0.7rem;
+  padding: 0.15rem 0.4rem;
+  border-radius: 4px;
+  font-weight: 600;
+}
+
+.success-badge.high {
+  background: rgba(34, 197, 94, 0.2);
+  color: var(--accent-green);
+}
+
+.success-badge.medium {
+  background: rgba(245, 158, 11, 0.2);
+  color: var(--accent-yellow);
+}
+
+.success-badge.low {
+  background: rgba(239, 68, 68, 0.2);
+  color: var(--accent-red);
+}
+
+.status-badge {
+  font-size: 0.7rem;
+  padding: 0.15rem 0.4rem;
+  border-radius: 4px;
+  font-weight: 600;
+}
+
+.status-badge.open {
+  background: rgba(34, 197, 94, 0.2);
+  color: var(--accent-green);
+}
+
+.status-badge.closed {
+  background: rgba(239, 68, 68, 0.2);
+  color: var(--accent-red);
+}
+
+.channel-nodes,
+.edge-direction {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.5rem;
+  font-size: 0.8rem;
+}
+
+.node-link {
+  color: var(--accent-purple);
+  font-family: var(--font-mono);
+}
+
+.arrow {
+  color: var(--text-muted);
+}
+
+.entity-item-stats {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 0.5rem;
+}
+
+.entity-item-stats .stat {
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+}
+
+.entity-item-stats .stat-label {
+  font-size: 0.7rem;
+  color: var(--text-muted);
+}
+
+.entity-item-stats .stat-value {
+  font-size: 0.8rem;
+  font-family: var(--font-mono);
+  color: var(--text-primary);
+}
+
+.entity-item-stats .stat-value.capacity,
+.entity-item-stats .stat-value.balance {
+  color: var(--accent-yellow);
+}
+
+.entity-item-stats .stat-value.error {
+  color: var(--accent-red);
+}
+
+.capacity-indicator {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: 0.5rem;
+  padding-top: 0.5rem;
+  border-top: 1px dashed var(--border-color);
+  font-size: 0.75rem;
+}
+
+.capacity-indicator .indicator-label {
+  color: var(--accent-blue);
+}
+
+.capacity-indicator .indicator-count {
+  color: var(--text-muted);
+  font-family: var(--font-mono);
+}

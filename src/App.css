@@ -81,13 +81,18 @@ body {
   transition: all 0.2s;
 }
 
-.view-btn:hover {
+.view-btn:hover:not(:disabled) {
   color: var(--text-primary);
 }
 
 .view-btn.active {
   background: var(--accent-blue);
   color: white;
+}
+
+.view-btn:disabled {
+  opacity: 0.6;
+  cursor: wait;
 }
 
 .header-actions button {
@@ -1005,6 +1010,19 @@ body {
   background: var(--text-muted);
 }
 
+/* Overview View Layout */
+.app-main.overview-view {
+  grid-template-columns: 1fr;
+  padding: 1rem;
+}
+
+.overview-main-panel {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  overflow: hidden;
+}
+
 /* Gantt View Layout */
 .app-main.gantt-view {
   grid-template-columns: 1fr 360px;
@@ -1013,6 +1031,24 @@ body {
 /* Tree View Layout */
 .app-main.tree-view {
   grid-template-columns: 1fr 360px;
+}
+
+/* Entity View Layout (Nodes, Channels, Edges) */
+.app-main.entity-view {
+  grid-template-columns: 1fr 400px;
+}
+
+.entity-list-panel {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.entity-detail-panel {
+  display: flex;
+  flex-direction: column;
+  overflow-y: auto;
 }
 
 .tree-main-panel {
@@ -1265,6 +1301,42 @@ body {
   color: #f59e0b;
 }
 
+/* Network view loading overlay */
+.network-loading-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(10, 14, 26, 0.8);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  backdrop-filter: blur(4px);
+}
+
+.loading-spinner {
+  width: 48px;
+  height: 48px;
+  border: 4px solid var(--bg-tertiary);
+  border-top-color: var(--accent-blue);
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+  margin-bottom: 1rem;
+}
+
+.loading-text {
+  color: var(--text-secondary);
+  font-size: 0.9rem;
+  font-weight: 500;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
 /* Responsive */
 @media (max-width: 1200px) {
   .app-main {
@@ -1320,5 +1392,22 @@ body {
 
   .tree-side-panel {
     max-height: 300px;
+  }
+
+  .app-main.overview-view {
+    padding: 0.5rem;
+  }
+
+  .app-main.entity-view {
+    grid-template-columns: 1fr;
+    grid-template-rows: 1fr auto;
+  }
+
+  .entity-list-panel {
+    min-height: 400px;
+  }
+
+  .entity-detail-panel {
+    max-height: 350px;
   }
 }

@@ -231,8 +231,11 @@ export function getTimeSteps(events: TimelineEvent[]): number[] {
   return Array.from(times).sort((a, b) => a - b);
 }
 
-// Format satoshi amount
-export function formatSatoshi(sats: number): string {
+// Format satoshi amount (input is in msats)
+export function formatSatoshi(msats: number): string {
+  // Convert msats to sats (1 sat = 1000 msats)
+  const sats = msats / 1000;
+  
   if (sats >= 100_000_000) {
     return `${(sats / 100_000_000).toFixed(4)} BTC`;
   }
@@ -242,7 +245,11 @@ export function formatSatoshi(sats: number): string {
   if (sats >= 1_000) {
     return `${(sats / 1_000).toFixed(2)}K sats`;
   }
-  return `${sats} sats`;
+  if (sats >= 1) {
+    return `${sats.toFixed(3)} sats`;
+  }
+  // For very small amounts, show in msats
+  return `${msats} msats`;
 }
 
 // Format time in milliseconds to readable format

@@ -1,11 +1,17 @@
-import { useState, useMemo, useCallback } from 'react';
+import { useState, useMemo, useCallback, useTransition } from 'react';
 import { DataLoader } from './components/DataLoader';
 import { NetworkGraph } from './components/NetworkGraph';
 import { TimelineControl } from './components/TimelineControl';
 import { PaymentDetails } from './components/PaymentDetails';
-import { StatsPanel } from './components/StatsPanel';
 import { GanttChart } from './components/GanttChart';
 import { PaymentTree } from './components/PaymentTree';
+import { SimulationOverview } from './components/SimulationOverview';
+import { NodeList } from './components/NodeList';
+import { ChannelList } from './components/ChannelList';
+import { EdgeList } from './components/EdgeList';
+import { NodeDetail } from './components/NodeDetail';
+import { ChannelDetail } from './components/ChannelDetail';
+import { EdgeDetail } from './components/EdgeDetail';
 import { 
   parseNodes, 
   parseChannels, 
@@ -17,7 +23,7 @@ import {
 import type { Node, Channel, Edge, Payment, SimulationConfig, TimelineEvent } from './types';
 import './App.css';
 
-type ViewMode = 'network' | 'gantt' | 'tree';
+type ViewMode = 'overview' | 'network' | 'gantt' | 'tree' | 'nodes' | 'channels' | 'edges';
 
 interface SimulationData {
   nodes: Node[];
@@ -33,8 +39,18 @@ function App() {
   const [currentStepIndex, setCurrentStepIndex] = useState(0);
   const [selectedPayment, setSelectedPayment] = useState<Payment | null>(null);
   const [selectedAttemptIndex, setSelectedAttemptIndex] = useState<number | undefined>();
-  const [showStats, setShowStats] = useState(true);
-  const [viewMode, setViewMode] = useState<ViewMode>('network');
+  const [viewMode, setViewMode] = useState<ViewMode>('overview');
+  const [selectedNodeId, setSelectedNodeId] = useState<number | null>(null);
+  const [selectedChannelId, setSelectedChannelId] = useState<number | null>(null);
+  const [selectedEdgeId, setSelectedEdgeId] = useState<number | null>(null);
+  const [isPending, startTransition] = useTransition();
+  
+  // Handler for view mode changes with transition
+  const handleViewModeChange = useCallback((mode: ViewMode) => {
+    startTransition(() => {
+      setViewMode(mode);
+    });
+  }, []);
 
   const handleDataLoaded = useCallback((rawData: {
     nodesContent: string;
@@ -82,7 +98,53 @@ function App() {
     setCurrentStepIndex(0);
     setSelectedPayment(null);
     setSelectedAttemptIndex(undefined);
+    setSelectedNodeId(null);
+    setSelectedChannelId(null);
+    setSelectedEdgeId(null);
   }, []);
+
+  // Handler for node selection (from list or network graph)
+  const handleNodeSelect = useCallback((nodeId: number) => {
+    setSelectedNodeId(nodeId);
+    // If in network view, stay there; otherwise switch to nodes view
+    if (viewMode !== 'network') {
+      handleViewModeChange('nodes');
+    }
+  }, [viewMode, handleViewModeChange]);
+
+  // Handler for channel selection (from list or network graph)
+  const handleChannelSelect = useCallback((channelId: number) => {
+    setSelectedChannelId(channelId);
+    if (viewMode !== 'network') {
+      handleViewModeChange('channels');
+    }
+  }, [viewMode, handleViewModeChange]);
+
+  // Handler for edge selection (from list or network graph)
+  const handleEdgeSelect = useCallback((edgeId: number) => {
+    setSelectedEdgeId(edgeId);
+    if (viewMode !== 'network') {
+      handleViewModeChange('edges');
+    }
+  }, [viewMode, handleViewModeChange]);
+
+  // Handler for network graph node click
+  const handleNetworkNodeClick = useCallback((nodeId: number) => {
+    setSelectedNodeId(nodeId);
+    setSelectedChannelId(null);
+    setSelectedEdgeId(null);
+  }, []);
+
+  // Handler for network graph edge click - converts edge to channel
+  const handleNetworkEdgeClick = useCallback((edgeId: number) => {
+    if (!data) return;
+    const edge = data.edges.find(e => e.id === edgeId);
+    if (edge) {
+      setSelectedChannelId(edge.channelId);
+      setSelectedEdgeId(edgeId);
+      setSelectedNodeId(null);
+    }
+  }, [data]);
 
   if (!data) {
     return <DataLoader onDataLoaded={handleDataLoaded} />;
@@ -95,41 +157,76 @@ function App() {
         <div className="header-actions">
           <div className="view-toggle">
             <button 
-              className={`view-btn ${viewMode === 'network' ? 'active' : ''}`}
-              onClick={() => setViewMode('network')}
+              className={`view-btn ${viewMode === 'overview' ? 'active' : ''}`}
+              onClick={() => handleViewModeChange('overview')}
+              disabled={isPending}
             >
-              ネットワーク
+              概要
+            </button>
+            <button 
+              className={`view-btn ${viewMode === 'network' ? 'active' : ''}`}
+              onClick={() => handleViewModeChange('network')}
+              disabled={isPending}
+            >
+              ネットワーク {isPending && viewMode !== 'network' && '...'}
+            </button>
+            <button 
+              className={`view-btn ${viewMode === 'nodes' ? 'active' : ''}`}
+              onClick={() => handleViewModeChange('nodes')}
+              disabled={isPending}
+            >
+              ノード
+            </button>
+            <button 
+              className={`view-btn ${viewMode === 'channels' ? 'active' : ''}`}
+              onClick={() => handleViewModeChange('channels')}
+              disabled={isPending}
+            >
+              チャネル
+            </button>
+            <button 
+              className={`view-btn ${viewMode === 'edges' ? 'active' : ''}`}
+              onClick={() => handleViewModeChange('edges')}
+              disabled={isPending}
+            >
+              エッジ
             </button>
             <button 
               className={`view-btn ${viewMode === 'gantt' ? 'active' : ''}`}
-              onClick={() => setViewMode('gantt')}
+              onClick={() => handleViewModeChange('gantt')}
+              disabled={isPending}
             >
               ガントチャート
             </button>
             <button 
               className={`view-btn ${viewMode === 'tree' ? 'active' : ''}`}
-              onClick={() => setViewMode('tree')}
+              onClick={() => handleViewModeChange('tree')}
+              disabled={isPending}
             >
               ペイメント一覧
             </button>
           </div>
-          {viewMode === 'network' && (
-            <button onClick={() => setShowStats(!showStats)} className="toggle-stats">
-              {showStats ? '統計を隠す' : '統計を表示'}
-            </button>
-          )}
           <button onClick={handleReset} className="reset-btn">
             別のデータを読み込む
           </button>
         </div>
       </header>
 
-      {viewMode === 'network' ? (
+      {viewMode === 'overview' ? (
+        <main className="app-main overview-view">
+          <div className="overview-main-panel">
+            <SimulationOverview
+              payments={data.payments}
+              config={data.config}
+              nodes={data.nodes}
+              channels={data.channels}
+              edges={data.edges}
+            />
+          </div>
+        </main>
+      ) : viewMode === 'network' ? (
         <main className="app-main">
           <div className="left-panel">
-            {showStats && (
-              <StatsPanel payments={data.payments} config={data.config} />
-            )}
             <TimelineControl
               events={data.events}
               payments={data.payments}
@@ -146,15 +243,139 @@ function App() {
               payments={data.payments}
               currentEvents={currentEvents}
               selectedPayment={selectedPayment}
+              onNodeClick={handleNetworkNodeClick}
+              onEdgeClick={handleNetworkEdgeClick}
             />
           </div>
 
           <div className="right-panel">
-            <PaymentDetails
-              payment={selectedPayment}
+            {selectedNodeId !== null ? (
+              <NodeDetail
+                nodeId={selectedNodeId}
+                nodes={data.nodes}
+                edges={data.edges}
+                channels={data.channels}
+                payments={data.payments}
+                onEdgeClick={(edgeId) => {
+                  setSelectedEdgeId(edgeId);
+                  setSelectedNodeId(null);
+                  setSelectedChannelId(null);
+                }}
+                onChannelClick={(channelId) => {
+                  setSelectedChannelId(channelId);
+                  setSelectedNodeId(null);
+                  setSelectedEdgeId(null);
+                }}
+              />
+            ) : selectedChannelId !== null ? (
+              <ChannelDetail
+                channelId={selectedChannelId}
+                channels={data.channels}
+                edges={data.edges}
+                payments={data.payments}
+                onNodeClick={(nodeId) => {
+                  setSelectedNodeId(nodeId);
+                  setSelectedChannelId(null);
+                  setSelectedEdgeId(null);
+                }}
+                onEdgeClick={(edgeId) => {
+                  setSelectedEdgeId(edgeId);
+                  setSelectedChannelId(null);
+                  setSelectedNodeId(null);
+                }}
+              />
+            ) : selectedEdgeId !== null ? (
+              <EdgeDetail
+                edgeId={selectedEdgeId}
+                edges={data.edges}
+                channels={data.channels}
+                payments={data.payments}
+                onNodeClick={(nodeId) => {
+                  setSelectedNodeId(nodeId);
+                  setSelectedEdgeId(null);
+                  setSelectedChannelId(null);
+                }}
+                onChannelClick={(channelId) => {
+                  setSelectedChannelId(channelId);
+                  setSelectedEdgeId(null);
+                  setSelectedNodeId(null);
+                }}
+              />
+            ) : (
+              <PaymentDetails
+                payment={selectedPayment}
+                edges={data.edges}
+                onAttemptSelect={handleAttemptSelect}
+                selectedAttemptIndex={selectedAttemptIndex}
+              />
+            )}
+          </div>
+        </main>
+      ) : viewMode === 'nodes' ? (
+        <main className="app-main entity-view">
+          <div className="entity-list-panel">
+            <NodeList
+              nodes={data.nodes}
               edges={data.edges}
-              onAttemptSelect={handleAttemptSelect}
-              selectedAttemptIndex={selectedAttemptIndex}
+              channels={data.channels}
+              payments={data.payments}
+              onNodeSelect={handleNodeSelect}
+              selectedNodeId={selectedNodeId ?? undefined}
+            />
+          </div>
+          <div className="entity-detail-panel">
+            <NodeDetail
+              nodeId={selectedNodeId}
+              nodes={data.nodes}
+              edges={data.edges}
+              channels={data.channels}
+              payments={data.payments}
+              onEdgeClick={handleEdgeSelect}
+              onChannelClick={handleChannelSelect}
+            />
+          </div>
+        </main>
+      ) : viewMode === 'channels' ? (
+        <main className="app-main entity-view">
+          <div className="entity-list-panel">
+            <ChannelList
+              channels={data.channels}
+              edges={data.edges}
+              payments={data.payments}
+              onChannelSelect={handleChannelSelect}
+              selectedChannelId={selectedChannelId ?? undefined}
+            />
+          </div>
+          <div className="entity-detail-panel">
+            <ChannelDetail
+              channelId={selectedChannelId}
+              channels={data.channels}
+              edges={data.edges}
+              payments={data.payments}
+              onNodeClick={handleNodeSelect}
+              onEdgeClick={handleEdgeSelect}
+            />
+          </div>
+        </main>
+      ) : viewMode === 'edges' ? (
+        <main className="app-main entity-view">
+          <div className="entity-list-panel">
+            <EdgeList
+              edges={data.edges}
+              channels={data.channels}
+              payments={data.payments}
+              onEdgeSelect={handleEdgeSelect}
+              selectedEdgeId={selectedEdgeId ?? undefined}
+            />
+          </div>
+          <div className="entity-detail-panel">
+            <EdgeDetail
+              edgeId={selectedEdgeId}
+              edges={data.edges}
+              channels={data.channels}
+              payments={data.payments}
+              onNodeClick={handleNodeSelect}
+              onChannelClick={handleChannelSelect}
             />
           </div>
         </main>
