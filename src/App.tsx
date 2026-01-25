@@ -110,7 +110,7 @@ function App() {
               className={`view-btn ${viewMode === 'tree' ? 'active' : ''}`}
               onClick={() => setViewMode('tree')}
             >
-              MPP分割ツリー
+              ペイメント一覧
             </button>
           </div>
           {viewMode === 'network' && (

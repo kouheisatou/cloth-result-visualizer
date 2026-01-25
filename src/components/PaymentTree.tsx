@@ -9,6 +9,11 @@ interface PaymentTreeProps {
   selectedPaymentId?: number;
 }
 
+type SortField = 'id' | 'amount' | 'startTime' | 'endTime' | 'duration' | 'attempts' | 'fee';
+type SortOrder = 'asc' | 'desc';
+type StatusFilter = 'all' | 'success' | 'failed';
+type TypeFilter = 'all' | 'mpp' | 'single' | 'shard';
+
 // Build a map of parent payments with their tree structure
 interface TreeNode {
   payment: Payment;
@@ -20,8 +25,15 @@ interface TreeNode {
 
 export function PaymentTree({ payments, onPaymentSelect, selectedPaymentId }: PaymentTreeProps) {
   const [expandedNodes, setExpandedNodes] = useState<Set<number>>(new Set());
-  const [filterStatus, setFilterStatus] = useState<'all' | 'success' | 'failed' | 'partial'>('all');
-  const [searchId, setSearchId] = useState('');
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
+  const [typeFilter, setTypeFilter] = useState<TypeFilter>('all');
+  const [sortField, setSortField] = useState<SortField>('id');
+  const [sortOrder, setSortOrder] = useState<SortOrder>('asc');
+  const [searchQuery, setSearchQuery] = useState('');
+  const [amountMin, setAmountMin] = useState('');
+  const [amountMax, setAmountMax] = useState('');
+  const [page, setPage] = useState(0);
+  const pageSize = 50;
 
   // Create payment map for quick lookup
   const paymentMap = useMemo(() => {
@@ -73,68 +85,104 @@ export function PaymentTree({ payments, onPaymentSelect, selectedPaymentId }: Pa
     };
   }, [paymentMap]);
 
-  // Get root payments (payments that are split into shards)
-  const rootTrees = useMemo(() => {
-    const roots: TreeNode[] = [];
-    
-    for (const payment of payments) {
-      // Only include payments that have shards (parent payments)
-      if ((payment.shard1Id >= 0 || payment.shard2Id >= 0) && !payment.isShard) {
-        roots.push(buildTree(payment, 0));
-      }
-    }
+  // Get root payments (exclude shards from top-level list)
+  const rootPayments = useMemo(() => {
+    return payments.filter(p => !p.isShard);
+  }, [payments]);
 
-    // Sort by start time
-    roots.sort((a, b) => a.payment.startTime - b.payment.startTime);
-
-    return roots;
-  }, [payments, buildTree]);
-
-  // Filter trees based on status and search
-  const filteredTrees = useMemo(() => {
-    return rootTrees.filter(tree => {
-      // Search filter
-      if (searchId) {
-        const id = parseInt(searchId);
-        if (!isNaN(id) && tree.payment.id !== id) {
-          // Check if any child has this ID
-          const hasChildWithId = (node: TreeNode): boolean => {
-            if (node.payment.id === id) return true;
-            return node.children.some(hasChildWithId);
-          };
-          if (!hasChildWithId(tree)) return false;
-        }
-      }
-
+  // Apply filters
+  const filteredPayments = useMemo(() => {
+    return rootPayments.filter(payment => {
       // Status filter
-      if (filterStatus === 'all') return true;
-      
-      // Count success/fail in tree
-      const countStatus = (node: TreeNode): { success: number; fail: number } => {
-        if (node.children.length === 0) {
-          return {
-            success: node.payment.isSuccess ? 1 : 0,
-            fail: node.payment.isSuccess ? 0 : 1,
-          };
-        }
-        const totals = { success: 0, fail: 0 };
-        for (const child of node.children) {
-          const childStatus = countStatus(child);
-          totals.success += childStatus.success;
-          totals.fail += childStatus.fail;
-        }
-        return totals;
-      };
+      if (statusFilter === 'success' && !payment.isSuccess) return false;
+      if (statusFilter === 'failed' && payment.isSuccess) return false;
 
-      const status = countStatus(tree);
-      
-      if (filterStatus === 'success') return status.fail === 0 && status.success > 0;
-      if (filterStatus === 'failed') return status.success === 0 && status.fail > 0;
-      if (filterStatus === 'partial') return status.success > 0 && status.fail > 0;
-      
+      // Type filter
+      const hasMpp = payment.shard1Id >= 0 || payment.shard2Id >= 0;
+      if (typeFilter === 'mpp' && !hasMpp) return false;
+      if (typeFilter === 'single' && hasMpp) return false;
+      if (typeFilter === 'shard' && !payment.isShard) return false;
+
+      // Search query (ID, sender, receiver)
+      if (searchQuery) {
+        const query = searchQuery.toLowerCase();
+        const idMatch = payment.id.toString().includes(query);
+        const senderMatch = payment.senderId.toString().includes(query);
+        const receiverMatch = payment.receiverId.toString().includes(query);
+        if (!idMatch && !senderMatch && !receiverMatch) return false;
+      }
+
+      // Amount range filter
+      if (amountMin) {
+        const min = parseInt(amountMin);
+        if (!isNaN(min) && payment.amount < min) return false;
+      }
+      if (amountMax) {
+        const max = parseInt(amountMax);
+        if (!isNaN(max) && payment.amount > max) return false;
+      }
+
       return true;
     });
-  }, [rootTrees, filterStatus, searchId]);
+  }, [rootPayments, statusFilter, typeFilter, searchQuery, amountMin, amountMax]);
+
+  // Sort payments
+  const sortedPayments = useMemo(() => {
+    const sorted = [...filteredPayments];
+    
+    sorted.sort((a, b) => {
+      let comparison = 0;
+      
+      switch (sortField) {
+        case 'id':
+          comparison = a.id - b.id;
+          break;
+        case 'amount':
+          comparison = a.amount - b.amount;
+          break;
+        case 'startTime':
+          comparison = a.startTime - b.startTime;
+          break;
+        case 'endTime':
+          comparison = a.endTime - b.endTime;
+          break;
+        case 'duration':
+          comparison = (a.endTime - a.startTime) - (b.endTime - b.startTime);
+          break;
+        case 'attempts':
+          comparison = a.attempts - b.attempts;
+          break;
+        case 'fee':
+          comparison = a.totalFee - b.totalFee;
+          break;
+      }
+      
+      return sortOrder === 'asc' ? comparison : -comparison;
+    });
+    
+    return sorted;
+  }, [filteredPayments, sortField, sortOrder]);
+
+  // Paginate
+  const paginatedPayments = useMemo(() => {
+    const start = page * pageSize;
+    return sortedPayments.slice(start, start + pageSize);
+  }, [sortedPayments, page, pageSize]);
+
+  const totalPages = Math.ceil(sortedPayments.length / pageSize);
+
+  // Stats
+  const stats = useMemo(() => {
+    const total = rootPayments.length;
+    const successful = rootPayments.filter(p => p.isSuccess).length;
+    const failed = total - successful;
+    const mppPayments = rootPayments.filter(p => p.shard1Id >= 0 || p.shard2Id >= 0).length;
+    const singlePayments = total - mppPayments;
+    const totalAmount = rootPayments.reduce((sum, p) => sum + p.amount, 0);
+    const avgAmount = total > 0 ? totalAmount / total : 0;
+
+    return { total, successful, failed, mppPayments, singlePayments, totalAmount, avgAmount };
+  }, [rootPayments]);
 
   const toggleExpand = useCallback((paymentId: number) => {
     setExpandedNodes(prev => {
@@ -148,98 +196,62 @@ export function PaymentTree({ payments, onPaymentSelect, selectedPaymentId }: Pa
     });
   }, []);
 
-  const expandAll = useCallback(() => {
-    const allIds = new Set<number>();
-    const collectIds = (node: TreeNode) => {
-      if (node.children.length > 0) {
-        allIds.add(node.payment.id);
-        node.children.forEach(collectIds);
-      }
-    };
-    filteredTrees.forEach(collectIds);
-    setExpandedNodes(allIds);
-  }, [filteredTrees]);
+  const handleSortClick = useCallback((field: SortField) => {
+    if (sortField === field) {
+      setSortOrder(prev => prev === 'asc' ? 'desc' : 'asc');
+    } else {
+      setSortField(field);
+      setSortOrder('asc');
+    }
+  }, [sortField]);
 
-  const collapseAll = useCallback(() => {
-    setExpandedNodes(new Set());
+  const resetFilters = useCallback(() => {
+    setStatusFilter('all');
+    setTypeFilter('all');
+    setSearchQuery('');
+    setAmountMin('');
+    setAmountMax('');
+    setPage(0);
   }, []);
 
-  // Calculate stats
-  const stats = useMemo(() => {
-    let totalRoots = rootTrees.length;
-    let successfulTrees = 0;
-    let failedTrees = 0;
-    let partialTrees = 0;
-
-    for (const tree of rootTrees) {
-      const countStatus = (node: TreeNode): { success: number; fail: number } => {
-        if (node.children.length === 0) {
-          return {
-            success: node.payment.isSuccess ? 1 : 0,
-            fail: node.payment.isSuccess ? 0 : 1,
-          };
-        }
-        const totals = { success: 0, fail: 0 };
-        for (const child of node.children) {
-          const childStatus = countStatus(child);
-          totals.success += childStatus.success;
-          totals.fail += childStatus.fail;
-        }
-        return totals;
+  // Count success/fail in tree for MPP payments
+  const countTreeStatus = useCallback((node: TreeNode): { success: number; fail: number } => {
+    if (node.children.length === 0) {
+      return {
+        success: node.payment.isSuccess ? 1 : 0,
+        fail: node.payment.isSuccess ? 0 : 1,
       };
-
-      const status = countStatus(tree);
-      if (status.fail === 0 && status.success > 0) successfulTrees++;
-      else if (status.success === 0 && status.fail > 0) failedTrees++;
-      else if (status.success > 0 && status.fail > 0) partialTrees++;
     }
+    const totals = { success: 0, fail: 0 };
+    for (const child of node.children) {
+      const childStatus = countTreeStatus(child);
+      totals.success += childStatus.success;
+      totals.fail += childStatus.fail;
+    }
+    return totals;
+  }, []);
 
-    return { totalRoots, successfulTrees, failedTrees, partialTrees };
-  }, [rootTrees]);
-
-  // Render a tree node
-  const renderTreeNode = (node: TreeNode, isLast: boolean, parentPrefix: string = ''): React.ReactElement => {
+  // Render tree node (for expanded MPP)
+  const renderTreeNode = (node: TreeNode, isLast: boolean): JSX.Element => {
     const { payment, children, depth } = node;
     const isExpanded = expandedNodes.has(payment.id);
     const hasChildren = children.length > 0;
     const isSelected = selectedPaymentId === payment.id;
 
-    // Calculate success/fail counts for this subtree
-    const countStatus = (n: TreeNode): { success: number; fail: number } => {
-      if (n.children.length === 0) {
-        return {
-          success: n.payment.isSuccess ? 1 : 0,
-          fail: n.payment.isSuccess ? 0 : 1,
-        };
-      }
-      const totals = { success: 0, fail: 0 };
-      for (const child of n.children) {
-        const childStatus = countStatus(child);
-        totals.success += childStatus.success;
-        totals.fail += childStatus.fail;
-      }
-      return totals;
-    };
-
-    const subtreeStatus = countStatus(node);
-
-    // Build prefix for tree lines
-    const prefix = depth === 0 ? '' : parentPrefix + (isLast ? '└── ' : '├── ');
-    const childPrefix = depth === 0 ? '' : parentPrefix + (isLast ? '    ' : '│   ');
-
     return (
-      <div key={payment.id} className="tree-node-container">
+      <div key={payment.id} className="tree-child-container">
         <div 
-          className={`tree-node ${isSelected ? 'selected' : ''} ${hasChildren ? 'has-children' : 'leaf'}`}
+          className={`tree-child-node ${isSelected ? 'selected' : ''}`}
           onClick={() => onPaymentSelect(payment)}
         >
-          {depth > 0 && (
-            <span className="tree-prefix">{prefix}</span>
-          )}
+          <span className="tree-indent">
+            {depth > 1 && Array(depth - 1).fill('│   ').join('')}
+            {isLast ? '└── ' : '├── '}
+          </span>
           
           {hasChildren && (
             <button 
-              className={`expand-btn ${isExpanded ? 'expanded' : ''}`}
+              className={`expand-btn small ${isExpanded ? 'expanded' : ''}`}
               onClick={(e) => {
                 e.stopPropagation();
                 toggleExpand(payment.id);
@@ -249,36 +261,22 @@ export function PaymentTree({ payments, onPaymentSelect, selectedPaymentId }: Pa
             </button>
           )}
 
-          <div className="node-content">
-            <span className="node-id">#{payment.id}</span>
-            <span className="node-amount">{formatSatoshi(payment.amount)}</span>
-            
-            {hasChildren ? (
-              <span className="node-split-info">
-                → {children.length}分割 ({node.leafCount}末端)
-              </span>
-            ) : (
-              <span className={`node-status ${payment.isSuccess ? 'success' : 'failed'}`}>
-                {payment.isSuccess ? '成功' : '失敗'}
-              </span>
-            )}
-
-            {hasChildren && (
-              <span className="subtree-status">
-                <span className="success-count">{subtreeStatus.success}</span>
-                /
-                <span className="fail-count">{subtreeStatus.fail}</span>
-              </span>
-            )}
-
-            <span className="node-time">{formatTime(payment.endTime - payment.startTime)}</span>
-          </div>
+          <span className="child-id">#{payment.id}</span>
+          <span className="child-amount">{formatSatoshi(payment.amount)}</span>
+          
+          {hasChildren ? (
+            <span className="child-split">→{children.length}分割</span>
+          ) : (
+            <span className={`child-status ${payment.isSuccess ? 'success' : 'failed'}`}>
+              {payment.isSuccess ? '成功' : '失敗'}
+            </span>
+          )}
         </div>
 
         {hasChildren && isExpanded && (
-          <div className="tree-children">
+          <div className="tree-grandchildren">
             {children.map((child, index) => 
-              renderTreeNode(child, index === children.length - 1, childPrefix)
+              renderTreeNode(child, index === children.length - 1)
             )}
           </div>
         )}
@@ -286,82 +284,264 @@ export function PaymentTree({ payments, onPaymentSelect, selectedPaymentId }: Pa
     );
   };
 
-  return (
-    <div className="payment-tree">
-      <div className="tree-header">
-        <h3>MPP分割ツリー</h3>
-        <div className="tree-controls">
-          <button onClick={expandAll} className="control-btn">
-            すべて展開
-          </button>
-          <button onClick={collapseAll} className="control-btn">
-            すべて折りたたむ
-          </button>
-        </div>
-      </div>
+  // Render payment row
+  const renderPaymentRow = (payment: Payment) => {
+    const hasMpp = payment.shard1Id >= 0 || payment.shard2Id >= 0;
+    const isExpanded = expandedNodes.has(payment.id);
+    const isSelected = selectedPaymentId === payment.id;
+    const duration = payment.endTime - payment.startTime;
 
-      <div className="tree-filters">
-        <div className="filter-group">
-          <label>ステータス:</label>
-          <select 
-            value={filterStatus} 
-            onChange={(e) => setFilterStatus(e.target.value as typeof filterStatus)}
-          >
-            <option value="all">すべて ({stats.totalRoots})</option>
-            <option value="success">完全成功 ({stats.successfulTrees})</option>
-            <option value="failed">完全失敗 ({stats.failedTrees})</option>
-            <option value="partial">部分成功 ({stats.partialTrees})</option>
-          </select>
-        </div>
-        <div className="search-group">
-          <label>ID検索:</label>
-          <input 
-            type="text" 
-            placeholder="Payment ID"
-            value={searchId}
-            onChange={(e) => setSearchId(e.target.value)}
-          />
-        </div>
-      </div>
+    let treeNode: TreeNode | null = null;
+    let treeStatus: { success: number; fail: number } | null = null;
+    
+    if (hasMpp) {
+      treeNode = buildTree(payment, 0);
+      treeStatus = countTreeStatus(treeNode);
+    }
 
-      <div className="tree-stats">
-        <span>表示中: <strong>{filteredTrees.length}</strong> 件のMPPペイメント</span>
-      </div>
-
-      <div className="tree-container">
-        {filteredTrees.length === 0 ? (
-          <div className="empty-tree">
-            <p>MPPで分割されたペイメントがありません</p>
+    return (
+      <div key={payment.id} className="payment-row-container">
+        <div 
+          className={`payment-row ${isSelected ? 'selected' : ''} ${hasMpp ? 'has-mpp' : ''}`}
+          onClick={() => onPaymentSelect(payment)}
+        >
+          {/* Expand button for MPP */}
+          <div className="row-expand">
+            {hasMpp && (
+              <button 
+                className={`expand-btn ${isExpanded ? 'expanded' : ''}`}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  toggleExpand(payment.id);
+                }}
+              >
+                {isExpanded ? '▼' : '▶'}
+              </button>
+            )}
           </div>
-        ) : (
-          filteredTrees.map((tree, index) => (
-            <div key={tree.payment.id} className="root-tree">
-              <div className="root-header">
-                <span className="root-index">#{index + 1}</span>
-                <span className="root-path">
-                  Node {tree.payment.senderId} → Node {tree.payment.receiverId}
-                </span>
-              </div>
-              {renderTreeNode(tree, true)}
-            </div>
-          ))
+
+          {/* ID */}
+          <div className="row-id">#{payment.id}</div>
+
+          {/* Type indicator */}
+          <div className="row-type">
+            {hasMpp ? (
+              <span className="type-badge mpp" title={`${treeNode?.leafCount}分割`}>
+                MPP
+              </span>
+            ) : (
+              <span className="type-badge single">単一</span>
+            )}
+          </div>
+
+          {/* Status */}
+          <div className="row-status">
+            {hasMpp && treeStatus ? (
+              <span className={`status-badge ${treeStatus.fail === 0 ? 'success' : treeStatus.success === 0 ? 'failed' : 'partial'}`}>
+                {treeStatus.fail === 0 ? '成功' : treeStatus.success === 0 ? '失敗' : '部分'}
+                <span className="status-detail">({treeStatus.success}/{treeStatus.success + treeStatus.fail})</span>
+              </span>
+            ) : (
+              <span className={`status-badge ${payment.isSuccess ? 'success' : 'failed'}`}>
+                {payment.isSuccess ? '成功' : '失敗'}
+              </span>
+            )}
+          </div>
+
+          {/* Amount */}
+          <div className="row-amount">{formatSatoshi(payment.amount)}</div>
+
+          {/* Route */}
+          <div className="row-route">
+            <span className="route-node sender">{payment.senderId}</span>
+            <span className="route-arrow">→</span>
+            <span className="route-node receiver">{payment.receiverId}</span>
+          </div>
+
+          {/* Attempts */}
+          <div className="row-attempts">
+            {hasMpp && treeNode ? (
+              <span title="総分割数">{treeNode.leafCount}</span>
+            ) : (
+              <span>{payment.attempts}</span>
+            )}
+          </div>
+
+          {/* Fee */}
+          <div className="row-fee">
+            {payment.totalFee > 0 ? formatSatoshi(payment.totalFee) : '-'}
+          </div>
+
+          {/* Duration */}
+          <div className="row-duration">{formatTime(duration)}</div>
+        </div>
+
+        {/* Expanded MPP tree */}
+        {hasMpp && isExpanded && treeNode && (
+          <div className="mpp-tree-expanded">
+            {treeNode.children.map((child, index) => 
+              renderTreeNode(child, index === treeNode!.children.length - 1)
+            )}
+          </div>
         )}
       </div>
+    );
+  };
 
-      <div className="tree-legend">
-        <div className="legend-item">
-          <span className="legend-icon success">●</span>
-          <span>成功</span>
-        </div>
-        <div className="legend-item">
-          <span className="legend-icon failed">●</span>
-          <span>失敗</span>
-        </div>
-        <div className="legend-item">
-          <span className="legend-icon split">▶</span>
-          <span>分割あり（クリックで展開）</span>
+  const SortHeader = ({ field, label }: { field: SortField; label: string }) => (
+    <div 
+      className={`sort-header ${sortField === field ? 'active' : ''}`}
+      onClick={() => handleSortClick(field)}
+    >
+      {label}
+      {sortField === field && (
+        <span className="sort-indicator">{sortOrder === 'asc' ? '↑' : '↓'}</span>
+      )}
+    </div>
+  );
+
+  return (
+    <div className="payment-list">
+      <div className="list-header">
+        <h3>ペイメント一覧</h3>
+        <div className="header-stats">
+          <span className="stat">全{stats.total}件</span>
+          <span className="stat success">成功: {stats.successful}</span>
+          <span className="stat failed">失敗: {stats.failed}</span>
+          <span className="stat mpp">MPP: {stats.mppPayments}</span>
         </div>
       </div>
+
+      <div className="list-filters">
+        <div className="filter-row">
+          <div className="filter-group">
+            <label>検索:</label>
+            <input 
+              type="text" 
+              placeholder="ID / 送信者 / 受信者"
+              value={searchQuery}
+              onChange={(e) => { setSearchQuery(e.target.value); setPage(0); }}
+              className="search-input"
+            />
+          </div>
+
+          <div className="filter-group">
+            <label>ステータス:</label>
+            <select 
+              value={statusFilter} 
+              onChange={(e) => { setStatusFilter(e.target.value as StatusFilter); setPage(0); }}
+            >
+              <option value="all">すべて</option>
+              <option value="success">成功のみ</option>
+              <option value="failed">失敗のみ</option>
+            </select>
+          </div>
+
+          <div className="filter-group">
+            <label>タイプ:</label>
+            <select 
+              value={typeFilter} 
+              onChange={(e) => { setTypeFilter(e.target.value as TypeFilter); setPage(0); }}
+            >
+              <option value="all">すべて</option>
+              <option value="mpp">MPPのみ</option>
+              <option value="single">単一のみ</option>
+            </select>
+          </div>
+        </div>
+
+        <div className="filter-row">
+          <div className="filter-group">
+            <label>金額範囲:</label>
+            <input 
+              type="number" 
+              placeholder="最小"
+              value={amountMin}
+              onChange={(e) => { setAmountMin(e.target.value); setPage(0); }}
+              className="amount-input"
+            />
+            <span className="range-separator">〜</span>
+            <input 
+              type="number" 
+              placeholder="最大"
+              value={amountMax}
+              onChange={(e) => { setAmountMax(e.target.value); setPage(0); }}
+              className="amount-input"
+            />
+          </div>
+
+          <button onClick={resetFilters} className="reset-btn">
+            フィルタをリセット
+          </button>
+        </div>
+      </div>
+
+      <div className="list-info">
+        <span>表示: {sortedPayments.length}件中 {page * pageSize + 1}〜{Math.min((page + 1) * pageSize, sortedPayments.length)}件</span>
+      </div>
+
+      <div className="list-table">
+        <div className="table-header">
+          <div className="row-expand"></div>
+          <SortHeader field="id" label="ID" />
+          <div className="header-cell">タイプ</div>
+          <div className="header-cell">ステータス</div>
+          <SortHeader field="amount" label="金額" />
+          <div className="header-cell">ルート</div>
+          <SortHeader field="attempts" label="試行" />
+          <SortHeader field="fee" label="手数料" />
+          <SortHeader field="duration" label="所要時間" />
+        </div>
+
+        <div className="table-body">
+          {paginatedPayments.length === 0 ? (
+            <div className="empty-list">
+              <p>条件に一致するペイメントがありません</p>
+            </div>
+          ) : (
+            paginatedPayments.map(payment => renderPaymentRow(payment))
+          )}
+        </div>
+      </div>
+
+      {/* Pagination */}
+      {totalPages > 1 && (
+        <div className="pagination">
+          <button 
+            onClick={() => setPage(0)} 
+            disabled={page === 0}
+            className="page-btn"
+          >
+            «
+          </button>
+          <button 
+            onClick={() => setPage(p => Math.max(0, p - 1))} 
+            disabled={page === 0}
+            className="page-btn"
+          >
+            ‹
+          </button>
+          
+          <span className="page-info">
+            {page + 1} / {totalPages}
+          </span>
+          
+          <button 
+            onClick={() => setPage(p => Math.min(totalPages - 1, p + 1))} 
+            disabled={page >= totalPages - 1}
+            className="page-btn"
+          >
+            ›
+          </button>
+          <button 
+            onClick={() => setPage(totalPages - 1)} 
+            disabled={page >= totalPages - 1}
+            className="page-btn"
+          >
+            »
+          </button>
+        </div>
+      )}
     </div>
   );
 }
