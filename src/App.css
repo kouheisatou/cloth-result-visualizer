@@ -106,10 +106,25 @@ body {
   transition: all 0.2s;
 }
 
-.header-actions button:hover {
+.header-actions button:hover:not(:disabled) {
   background: var(--bg-card);
   color: var(--text-primary);
   border-color: var(--accent-blue);
+}
+
+.header-actions button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.reload-btn {
+  background: linear-gradient(135deg, var(--accent-green), var(--accent-cyan)) !important;
+  border: none !important;
+  color: white !important;
+}
+
+.reload-btn:hover:not(:disabled) {
+  box-shadow: 0 2px 12px rgba(34, 197, 94, 0.3);
 }
 
 .app-main {

@@ -1,5 +1,6 @@
 import { useState, useMemo, useCallback, useTransition } from 'react';
 import { DataLoader } from './components/DataLoader';
+import type { LoadSource } from './components/DataLoader';
 import { NetworkGraph } from './components/NetworkGraph';
 import { TimelineControl } from './components/TimelineControl';
 import { PaymentDetails } from './components/PaymentDetails';
@@ -36,6 +37,8 @@ interface SimulationData {
 
 function App() {
   const [data, setData] = useState<SimulationData | null>(null);
+  const [loadSource, setLoadSource] = useState<LoadSource | null>(null);
+  const [isReloading, setIsReloading] = useState(false);
   const [currentStepIndex, setCurrentStepIndex] = useState(0);
   const [selectedPayment, setSelectedPayment] = useState<Payment | null>(null);
   const [selectedAttemptIndex, setSelectedAttemptIndex] = useState<number | undefined>();
@@ -58,7 +61,7 @@ function App() {
     edgesContent: string;
     paymentsContent: string;
     configContent: string;
-  }) => {
+  }, source?: LoadSource) => {
     try {
       const nodes = parseNodes(rawData.nodesContent);
       const channels = parseChannels(rawData.channelsContent);
@@ -68,6 +71,9 @@ function App() {
       const events = generateTimelineEvents(payments);
 
       setData({ nodes, channels, edges, payments, config, events });
+      if (source) {
+        setLoadSource(source);
+      }
       setCurrentStepIndex(0);
       setSelectedPayment(null);
     } catch (error) {
@@ -99,6 +105,7 @@ function App() {
 
   const handleReset = useCallback(() => {
     setData(null);
+    setLoadSource(null);
     setCurrentStepIndex(0);
     setSelectedPayment(null);
     setSelectedAttemptIndex(undefined);
@@ -106,6 +113,75 @@ function App() {
     setSelectedChannelId(null);
     setSelectedEdgeId(null);
   }, []);
+
+  const handleReload = useCallback(async () => {
+    if (!loadSource) return;
+
+    setIsReloading(true);
+    try {
+      const readFile = (file: File): Promise<string> => {
+        return new Promise((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onload = (e) => resolve(e.target?.result as string);
+          reader.onerror = () => reject(new Error(`Failed to read ${file.name}`));
+          reader.readAsText(file);
+        });
+      };
+
+      if (loadSource.type === 'files') {
+        const [nodesContent, channelsContent, edgesContent, paymentsContent, configContent] = await Promise.all([
+          readFile(loadSource.files.nodes),
+          readFile(loadSource.files.channels),
+          readFile(loadSource.files.edges),
+          readFile(loadSource.files.payments),
+          readFile(loadSource.files.config),
+        ]);
+
+        handleDataLoaded({
+          nodesContent,
+          channelsContent,
+          edgesContent,
+          paymentsContent,
+          configContent,
+        });
+      } else {
+        // Sample data - add cache busting
+        const timestamp = Date.now();
+        const [nodesRes, channelsRes, edgesRes, paymentsRes, configRes] = await Promise.all([
+          fetch(`data/nodes_output.csv?t=${timestamp}`),
+          fetch(`data/channels_output.csv?t=${timestamp}`),
+          fetch(`data/edges_output.csv?t=${timestamp}`),
+          fetch(`data/payments_output.csv?t=${timestamp}`),
+          fetch(`data/cloth_input.txt?t=${timestamp}`),
+        ]);
+
+        if (!nodesRes.ok || !channelsRes.ok || !edgesRes.ok || !paymentsRes.ok || !configRes.ok) {
+          throw new Error('サンプルデータの再読み込みに失敗しました');
+        }
+
+        const [nodesContent, channelsContent, edgesContent, paymentsContent, configContent] = await Promise.all([
+          nodesRes.text(),
+          channelsRes.text(),
+          edgesRes.text(),
+          paymentsRes.text(),
+          configRes.text(),
+        ]);
+
+        handleDataLoaded({
+          nodesContent,
+          channelsContent,
+          edgesContent,
+          paymentsContent,
+          configContent,
+        });
+      }
+    } catch (error) {
+      console.error('Failed to reload data:', error);
+      alert('データの再読み込みに失敗しました。');
+    } finally {
+      setIsReloading(false);
+    }
+  }, [loadSource, handleDataLoaded]);
 
   // Handler for node selection (from list or network graph)
   const handleNodeSelect = useCallback((nodeId: number) => {
@@ -241,6 +317,9 @@ function App() {
               ペイメント一覧
             </button>
           </div>
+          <button onClick={handleReload} className="reload-btn" disabled={isReloading}>
+            {isReloading ? '更新中...' : '更新'}
+          </button>
           <button onClick={handleReset} className="reset-btn">
             別のデータを読み込む
           </button>

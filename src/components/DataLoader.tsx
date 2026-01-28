@@ -1,5 +1,9 @@
 import { useCallback, useState } from 'react';
 
+export type LoadSource = 
+  | { type: 'files'; files: { nodes: File; channels: File; edges: File; payments: File; config: File } }
+  | { type: 'sample' };
+
 interface DataLoaderProps {
   onDataLoaded: (data: {
     nodesContent: string;
@@ -7,7 +11,7 @@ interface DataLoaderProps {
     edgesContent: string;
     paymentsContent: string;
     configContent: string;
-  }) => void;
+  }, source: LoadSource) => void;
 }
 
 export function DataLoader({ onDataLoaded }: DataLoaderProps) {
@@ -62,6 +66,15 @@ export function DataLoader({ onDataLoaded }: DataLoaderProps) {
         edgesContent,
         paymentsContent,
         configContent,
+      }, {
+        type: 'files',
+        files: {
+          nodes: files.nodes,
+          channels: files.channels,
+          edges: files.edges,
+          payments: files.payments,
+          config: files.config,
+        }
       });
     } catch (err) {
       setError(err instanceof Error ? err.message : 'ファイルの読み込みに失敗しました');
@@ -103,7 +116,7 @@ export function DataLoader({ onDataLoaded }: DataLoaderProps) {
         edgesContent,
         paymentsContent,
         configContent,
-      });
+      }, { type: 'sample' });
     } catch (err) {
       setError(err instanceof Error ? err.message : 'サンプルデータの読み込みに失敗しました');
     } finally {
