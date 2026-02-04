@@ -117,71 +117,57 @@ function App() {
   const handleReload = useCallback(async () => {
     if (!loadSource) return;
 
+    // ファイルからロードした場合は再選択を促す
+    if (loadSource.type === 'files') {
+      const shouldReload = confirm(
+        'ファイルを更新した場合は、「別のデータを読み込む」ボタンから再度ファイルを選択してください。\n' +
+        'このまま続行すると、サンプルデータが読み込まれます。続行しますか？'
+      );
+      if (!shouldReload) return;
+
+      // ユーザーが続行を選択した場合、データをリセットして再選択を促す
+      handleReset();
+      return;
+    }
+
     setIsReloading(true);
     try {
-      const readFile = (file: File): Promise<string> => {
-        return new Promise((resolve, reject) => {
-          const reader = new FileReader();
-          reader.onload = (e) => resolve(e.target?.result as string);
-          reader.onerror = () => reject(new Error(`Failed to read ${file.name}`));
-          reader.readAsText(file);
-        });
-      };
+      // サンプルデータの場合のみ再読み込み - キャッシュバスティングを使用
+      const timestamp = Date.now();
+      const [nodesRes, channelsRes, edgesRes, paymentsRes, configRes] = await Promise.all([
+        fetch(`data/nodes_output.csv?t=${timestamp}`),
+        fetch(`data/channels_output.csv?t=${timestamp}`),
+        fetch(`data/edges_output.csv?t=${timestamp}`),
+        fetch(`data/payments_output.csv?t=${timestamp}`),
+        fetch(`data/cloth_input.txt?t=${timestamp}`),
+      ]);
 
-      if (loadSource.type === 'files') {
-        const [nodesContent, channelsContent, edgesContent, paymentsContent, configContent] = await Promise.all([
-          readFile(loadSource.files.nodes),
-          readFile(loadSource.files.channels),
-          readFile(loadSource.files.edges),
-          readFile(loadSource.files.payments),
-          readFile(loadSource.files.config),
-        ]);
-
-        handleDataLoaded({
-          nodesContent,
-          channelsContent,
-          edgesContent,
-          paymentsContent,
-          configContent,
-        });
-      } else {
-        // Sample data - add cache busting
-        const timestamp = Date.now();
-        const [nodesRes, channelsRes, edgesRes, paymentsRes, configRes] = await Promise.all([
-          fetch(`data/nodes_output.csv?t=${timestamp}`),
-          fetch(`data/channels_output.csv?t=${timestamp}`),
-          fetch(`data/edges_output.csv?t=${timestamp}`),
-          fetch(`data/payments_output.csv?t=${timestamp}`),
-          fetch(`data/cloth_input.txt?t=${timestamp}`),
-        ]);
-
-        if (!nodesRes.ok || !channelsRes.ok || !edgesRes.ok || !paymentsRes.ok || !configRes.ok) {
-          throw new Error('サンプルデータの再読み込みに失敗しました');
-        }
-
-        const [nodesContent, channelsContent, edgesContent, paymentsContent, configContent] = await Promise.all([
-          nodesRes.text(),
-          channelsRes.text(),
-          edgesRes.text(),
-          paymentsRes.text(),
-          configRes.text(),
-        ]);
-
-        handleDataLoaded({
-          nodesContent,
-          channelsContent,
-          edgesContent,
-          paymentsContent,
-          configContent,
-        });
+      if (!nodesRes.ok || !channelsRes.ok || !edgesRes.ok || !paymentsRes.ok || !configRes.ok) {
+        throw new Error('サンプルデータの再読み込みに失敗しました');
       }
+
+      const [nodesContent, channelsContent, edgesContent, paymentsContent, configContent] = await Promise.all([
+        nodesRes.text(),
+        channelsRes.text(),
+        edgesRes.text(),
+        paymentsRes.text(),
+        configRes.text(),
+      ]);
+
+      handleDataLoaded({
+        nodesContent,
+        channelsContent,
+        edgesContent,
+        paymentsContent,
+        configContent,
+      });
     } catch (error) {
       console.error('Failed to reload data:', error);
       alert('データの再読み込みに失敗しました。');
     } finally {
       setIsReloading(false);
     }
-  }, [loadSource, handleDataLoaded]);
+  }, [loadSource, handleDataLoaded, handleReset]);
 
   // Handler for node selection (from list or network graph)
   const handleNodeSelect = useCallback((nodeId: number) => {

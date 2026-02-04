@@ -1,7 +1,7 @@
 import { useCallback, useState } from 'react';
 
 export type LoadSource = 
-  | { type: 'files'; files: { nodes: File; channels: File; edges: File; payments: File; config: File } }
+  | { type: 'files'; filePaths: { nodes: string; channels: string; edges: string; payments: string; config: string } }
   | { type: 'sample' };
 
 interface DataLoaderProps {
@@ -32,6 +32,84 @@ export function DataLoader({ onDataLoaded }: DataLoaderProps) {
       setError(null);
     }
   }, []);
+
+  const handleFolderSelect = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const fileList = e.target.files;
+    if (!fileList || fileList.length === 0) return;
+
+    setError(null);
+
+    // フォルダ内のファイルから必要なファイルを自動検出
+    const filesArray = Array.from(fileList);
+
+    const nodesFile = filesArray.find(f => f.name === 'nodes_output.csv');
+    const channelsFile = filesArray.find(f => f.name === 'channels_output.csv');
+    const edgesFile = filesArray.find(f => f.name === 'edges_output.csv');
+    const paymentsFile = filesArray.find(f => f.name === 'payments_output.csv');
+    const configFile = filesArray.find(f => f.name === 'cloth_input.txt');
+
+    const missingFiles: string[] = [];
+    if (!nodesFile) missingFiles.push('nodes_output.csv');
+    if (!channelsFile) missingFiles.push('channels_output.csv');
+    if (!edgesFile) missingFiles.push('edges_output.csv');
+    if (!paymentsFile) missingFiles.push('payments_output.csv');
+    if (!configFile) missingFiles.push('cloth_input.txt');
+
+    if (missingFiles.length > 0) {
+      setError(`フォルダ内に以下のファイルが見つかりません: ${missingFiles.join(', ')}`);
+      return;
+    }
+
+    setFiles({
+      nodes: nodesFile,
+      channels: channelsFile,
+      edges: edgesFile,
+      payments: paymentsFile,
+      config: configFile,
+    });
+
+    // 自動的に読み込みを開始
+    setLoading(true);
+    try {
+      const readFile = (file: File): Promise<string> => {
+        return new Promise((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onload = (e) => resolve(e.target?.result as string);
+          reader.onerror = () => reject(new Error(`Failed to read ${file.name}`));
+          reader.readAsText(file);
+        });
+      };
+
+      const [nodesContent, channelsContent, edgesContent, paymentsContent, configContent] = await Promise.all([
+        readFile(nodesFile!),
+        readFile(channelsFile!),
+        readFile(edgesFile!),
+        readFile(paymentsFile!),
+        readFile(configFile!),
+      ]);
+
+      onDataLoaded({
+        nodesContent,
+        channelsContent,
+        edgesContent,
+        paymentsContent,
+        configContent,
+      }, {
+        type: 'files',
+        filePaths: {
+          nodes: nodesFile!.name,
+          channels: channelsFile!.name,
+          edges: edgesFile!.name,
+          payments: paymentsFile!.name,
+          config: configFile!.name,
+        }
+      });
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'ファイルの読み込みに失敗しました');
+    } finally {
+      setLoading(false);
+    }
+  }, [onDataLoaded]);
 
   const loadFiles = useCallback(async () => {
     if (!files.nodes || !files.channels || !files.edges || !files.payments || !files.config) {
@@ -68,12 +146,12 @@ export function DataLoader({ onDataLoaded }: DataLoaderProps) {
         configContent,
       }, {
         type: 'files',
-        files: {
-          nodes: files.nodes,
-          channels: files.channels,
-          edges: files.edges,
-          payments: files.payments,
-          config: files.config,
+        filePaths: {
+          nodes: files.nodes.name,
+          channels: files.channels.name,
+          edges: files.edges.name,
+          payments: files.payments.name,
+          config: files.config.name,
         }
       });
     } catch (err) {
@@ -210,7 +288,21 @@ export function DataLoader({ onDataLoaded }: DataLoaderProps) {
         >
           {loading ? '読み込み中...' : 'ファイルを読み込む'}
         </button>
-        
+
+        <label className="folder-select-btn">
+          <input
+            type="file"
+            // @ts-ignore - webkitdirectory is not in TypeScript definitions
+            webkitdirectory=""
+            directory=""
+            multiple
+            onChange={handleFolderSelect}
+            disabled={loading}
+            style={{ display: 'none' }}
+          />
+          <span className="btn-content">📁 フォルダから読み込む</span>
+        </label>
+
         <button 
           onClick={loadSampleData}
           disabled={loading}
@@ -224,7 +316,8 @@ export function DataLoader({ onDataLoaded }: DataLoaderProps) {
         <h3>使い方</h3>
         <ol>
           <li>CLOTHシミュレータの出力ファイルを選択します</li>
-          <li>「ファイルを読み込む」をクリックします</li>
+          <li>個別にファイルを選択するか、「フォルダから読み込む」でフォルダ全体を選択できます</li>
+          <li>「ファイルを読み込む」をクリックします（フォルダ選択時は自動で読み込まれます）</li>
           <li>グラフビューでネットワークを確認できます</li>
           <li>タイムラインコントロールで時系列を追跡できます</li>
         </ol>
