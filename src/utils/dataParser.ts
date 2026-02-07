@@ -81,16 +81,14 @@ export function parsePayments(csv: string): Payment[] {
       mpp: parseInt(row.mpp),
       isShard: row.is_shard === '1',
       parentPaymentId: parseInt(row.parent_payment_id),
-      shard1Id: parseInt(row.shard1_id),
-      shard2Id: parseInt(row.shard2_id),
+      shards: row.shards || '',
       isSuccess: row.is_success === '1',
-      isRolledBack: row.is_rolledback === '1',
       noBalanceCount: parseInt(row.no_balance_count),
       offlineNodeCount: parseInt(row.offline_node_count),
       timeoutExp: parseInt(row.timeout_exp),
       attempts: parseInt(row.attempts),
       route: row.route ? row.route.split('-').map(Number).filter(n => !isNaN(n)) : [],
-      totalFee: parseInt(row.total_fee),
+      totalFee: parseInt(row.total_fee) || 0,
       attemptsHistory,
     };
   });
@@ -102,18 +100,13 @@ export function parsePayments(csv: string): Payment[] {
   }
 
   for (const payment of payments) {
-    if (payment.shard1Id >= 0 || payment.shard2Id >= 0) {
+    if (payment.shards) {
+      const shardIds = payment.shards.split('-').map(Number).filter(n => !isNaN(n));
       const shards: Payment[] = [];
-      if (payment.shard1Id >= 0) {
-        const shard1 = paymentMap.get(payment.shard1Id);
-        if (shard1) {
-          shards.push(shard1);
-        }
-      }
-      if (payment.shard2Id >= 0) {
-        const shard2 = paymentMap.get(payment.shard2Id);
-        if (shard2) {
-          shards.push(shard2);
+      for (const shardId of shardIds) {
+        const shard = paymentMap.get(shardId);
+        if (shard) {
+          shards.push(shard);
         }
       }
       if (shards.length > 0) {
@@ -186,6 +179,18 @@ export function generateTimelineEvents(payments: Payment[]): TimelineEvent[] {
     for (let i = 0; i < payment.attemptsHistory.length; i++) {
       const attempt = payment.attemptsHistory[i];
       
+      // Handle split attempts (no route, just indicates splitting)
+      if (attempt.is_split) {
+        events.push({
+          time: attempt.end_time,
+          type: 'payment_attempt',
+          paymentId: payment.id,
+          attemptIndex: i,
+          routeEdges: [],
+        });
+        continue;
+      }
+
       if (attempt.route && attempt.route.length > 0) {
         events.push({
           time: attempt.end_time - 100, // Approximate attempt start time
@@ -196,7 +201,7 @@ export function generateTimelineEvents(payments: Payment[]): TimelineEvent[] {
         });
       }
 
-      if (attempt.is_succeeded) {
+      if (attempt.is_succeeded === 1) {
         events.push({
           time: attempt.end_time,
           type: 'payment_success',
@@ -204,7 +209,7 @@ export function generateTimelineEvents(payments: Payment[]): TimelineEvent[] {
           attemptIndex: i,
           routeEdges: attempt.route?.map(hop => hop.edge_id) || [],
         });
-      } else if (attempt.error_edge > 0) {
+      } else if (attempt.error_edge && attempt.error_edge > 0) {
         events.push({
           time: attempt.end_time,
           type: 'payment_fail',

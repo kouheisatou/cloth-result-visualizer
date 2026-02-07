@@ -69,7 +69,7 @@ export function EdgeList({
         }
         
         // Count failures
-        if (attempt.error_edge > 0) {
+        if (attempt.error_edge && attempt.error_edge > 0) {
           failureCounts.set(attempt.error_edge, (failureCounts.get(attempt.error_edge) || 0) + 1);
         }
       }

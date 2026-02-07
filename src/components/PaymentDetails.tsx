@@ -55,7 +55,7 @@ export function PaymentDetails({
   const getErrorDescription = (attempt: AttemptHistory) => {
     if (attempt.is_succeeded) return null;
     
-    const errorEdge = edgeMap.get(attempt.error_edge);
+    const errorEdge = attempt.error_edge ? edgeMap.get(attempt.error_edge) : undefined;
     const errorTypes: Record<number, string> = {
       0: 'ルートなし',
       1: '残高不足',
@@ -66,9 +66,9 @@ export function PaymentDetails({
     return (
       <div className="error-info">
         <span className="error-type">
-          {errorTypes[attempt.error_type] || `エラー: ${attempt.error_type}`}
+          {attempt.error_type !== undefined ? (errorTypes[attempt.error_type] || `エラー: ${attempt.error_type}`) : 'エラー'}
         </span>
-        {errorEdge && (
+        {errorEdge && attempt.error_edge && (
           <span className="error-edge">
             @ Edge #{attempt.error_edge} ({errorEdge.fromNodeId} → {errorEdge.toNodeId})
           </span>

@@ -74,7 +74,7 @@ export function GanttChart({ payments, onPaymentSelect, selectedPaymentId }: Gan
           startTime,
           endTime: attempt.end_time,
           isSuccess: attempt.is_succeeded === 1,
-          errorType: attempt.error_type,
+          errorType: attempt.error_type || 0,
           route: attempt.route,
           payment,
         });
@@ -121,27 +121,19 @@ export function GanttChart({ payments, onPaymentSelect, selectedPaymentId }: Gan
     
     for (const payment of filteredPayments) {
       // Parent to child relationship (split payments)
-      if (payment.shard1Id >= 0) {
-        const shard1 = preprocessedData.paymentMap.get(payment.shard1Id);
-        if (shard1 && filteredSet.has(shard1.id)) {
-          conns.push({
-            fromPaymentId: payment.id,
-            toPaymentId: shard1.id,
-            type: 'parent-child',
-            splitIndex: 0,
-          });
-        }
-      }
-      if (payment.shard2Id >= 0) {
-        const shard2 = preprocessedData.paymentMap.get(payment.shard2Id);
-        if (shard2 && filteredSet.has(shard2.id)) {
-          conns.push({
-            fromPaymentId: payment.id,
-            toPaymentId: shard2.id,
-            type: 'parent-child',
-            splitIndex: 1,
-          });
-        }
+      if (payment.shards) {
+        const shardIds = payment.shards.split('-').map(Number).filter(n => !isNaN(n));
+        shardIds.forEach((shardId, index) => {
+          const shard = preprocessedData.paymentMap.get(shardId);
+          if (shard && filteredSet.has(shard.id)) {
+            conns.push({
+              fromPaymentId: payment.id,
+              toPaymentId: shard.id,
+              type: 'parent-child',
+              splitIndex: index,
+            });
+          }
+        });
       }
     }
     
@@ -297,7 +289,7 @@ export function GanttChart({ payments, onPaymentSelect, selectedPaymentId }: Gan
           {/* Payment labels (Y-axis) */}
           <g className="payment-labels">
             {filteredPayments.map((payment, index) => {
-              const hasSplits = payment.shard1Id >= 0 || payment.shard2Id >= 0;
+              const hasSplits = payment.shards && payment.shards.length > 0;
               const isShard = payment.isShard;
               
               return (
@@ -568,8 +560,8 @@ export function GanttChart({ payments, onPaymentSelect, selectedPaymentId }: Gan
               <div className="tooltip-row">
                 <span className="label">ルート</span>
                 <span className="value">
-                  {hoveredAttempt.route?.length > 0 
-                    ? `${hoveredAttempt.route.length} ホップ` 
+                  {hoveredAttempt.route && hoveredAttempt.route.length > 0
+                    ? `${hoveredAttempt.route.length} ホップ`
                     : 'ルートなし'}
                 </span>
               </div>
@@ -583,14 +575,10 @@ export function GanttChart({ payments, onPaymentSelect, selectedPaymentId }: Gan
                   <span className="value shard">親: #{hoveredAttempt.payment.parentPaymentId}</span>
                 </div>
               )}
-              {(hoveredAttempt.payment.shard1Id >= 0 || hoveredAttempt.payment.shard2Id >= 0) && (
+              {hoveredAttempt.payment.shards && hoveredAttempt.payment.shards.length > 0 && (
                 <div className="tooltip-row">
                   <span className="label">分割先</span>
-                  <span className="value shard">
-                    {hoveredAttempt.payment.shard1Id >= 0 && `#${hoveredAttempt.payment.shard1Id}`}
-                    {hoveredAttempt.payment.shard1Id >= 0 && hoveredAttempt.payment.shard2Id >= 0 && ', '}
-                    {hoveredAttempt.payment.shard2Id >= 0 && `#${hoveredAttempt.payment.shard2Id}`}
-                  </span>
+                  <span className="value shard">{hoveredAttempt.payment.shards}</span>
                 </div>
               )}
             </div>

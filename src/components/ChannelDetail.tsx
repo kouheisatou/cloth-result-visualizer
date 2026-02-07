@@ -55,7 +55,7 @@ export function ChannelDetail({
           usageCount++;
           paymentIds.add(payment.id);
         }
-        if (attempt.error_edge > 0 && edgeIds.has(attempt.error_edge)) {
+        if (attempt.error_edge && attempt.error_edge > 0 && edgeIds.has(attempt.error_edge)) {
           failureCount++;
         }
       }

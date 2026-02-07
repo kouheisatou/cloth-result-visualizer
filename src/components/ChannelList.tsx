@@ -53,7 +53,7 @@ export function ChannelList({
             usageCounts.set(edge.channelId, (usageCounts.get(edge.channelId) || 0) + 1);
           }
         }
-        if (attempt.error_edge > 0) {
+        if (attempt.error_edge && attempt.error_edge > 0) {
           const errorEdge = edgeMap.get(attempt.error_edge);
           if (errorEdge) {
             failureCounts.set(errorEdge.channelId, (failureCounts.get(errorEdge.channelId) || 0) + 1);

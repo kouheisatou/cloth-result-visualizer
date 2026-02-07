@@ -49,11 +49,14 @@ export interface RouteHop {
 // Payment attempt history
 export interface AttemptHistory {
   attempts: number;
-  is_succeeded: number;
+  is_succeeded?: number;
+  is_split?: boolean;
   end_time: number;
-  error_edge: number;
-  error_type: number;
-  route: RouteHop[];
+  error_edge?: number;
+  error_type?: number;
+  route?: RouteHop[];
+  shard1_id?: number;
+  shard2_id?: number;
 }
 
 // Payment data
@@ -68,10 +71,8 @@ export interface Payment {
   mpp: number;
   isShard: boolean;
   parentPaymentId: number;
-  shard1Id: number;
-  shard2Id: number;
+  shards: string; // e.g., "100-101" for two shards
   isSuccess: boolean;
-  isRolledBack: boolean;
   noBalanceCount: number;
   offlineNodeCount: number;
   timeoutExp: number;

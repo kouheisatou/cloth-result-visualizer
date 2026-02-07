@@ -79,7 +79,6 @@ export function SimulationOverview({ payments, config, nodes, channels, edges }:
   const noBalanceErrors = payments.reduce((sum, p) => sum + p.noBalanceCount, 0);
   const offlineErrors = payments.reduce((sum, p) => sum + p.offlineNodeCount, 0);
   const timeoutPayments = rootPayments.filter(p => !p.isSuccess && p.timeoutExp > 0).length;
-  const rolledBackPayments = payments.filter(p => p.isRolledBack).length;
 
   // Multipath statistics
   const splitPayments = rootPayments.filter(p => p.childShards && p.childShards.length > 0);
@@ -248,10 +247,6 @@ export function SimulationOverview({ payments, config, nodes, channels, edges }:
             <div className="stats-row">
               <span className="stats-label">タイムアウト</span>
               <span className="stats-value error">{timeoutPayments}</span>
-            </div>
-            <div className="stats-row">
-              <span className="stats-label">ロールバック</span>
-              <span className="stats-value">{rolledBackPayments}</span>
             </div>
           </div>
         </section>

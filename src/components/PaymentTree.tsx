@@ -52,23 +52,16 @@ export function PaymentTree({ payments, onPaymentSelect, selectedPaymentId }: Pa
       let totalLeafAmount = 0;
       let leafCount = 0;
 
-      if (payment.shard1Id >= 0) {
-        const shard1 = paymentMap.get(payment.shard1Id);
-        if (shard1) {
-          const childTree = buildTree(shard1, depth + 1, cache);
-          children.push(childTree);
-          totalLeafAmount += childTree.totalLeafAmount;
-          leafCount += childTree.leafCount;
-        }
-      }
-
-      if (payment.shard2Id >= 0) {
-        const shard2 = paymentMap.get(payment.shard2Id);
-        if (shard2) {
-          const childTree = buildTree(shard2, depth + 1, cache);
-          children.push(childTree);
-          totalLeafAmount += childTree.totalLeafAmount;
-          leafCount += childTree.leafCount;
+      if (payment.shards) {
+        const shardIds = payment.shards.split('-').map(Number).filter(n => !isNaN(n));
+        for (const shardId of shardIds) {
+          const shard = paymentMap.get(shardId);
+          if (shard) {
+            const childTree = buildTree(shard, depth + 1, cache);
+            children.push(childTree);
+            totalLeafAmount += childTree.totalLeafAmount;
+            leafCount += childTree.leafCount;
+          }
         }
       }
 
@@ -103,7 +96,7 @@ export function PaymentTree({ payments, onPaymentSelect, selectedPaymentId }: Pa
     const total = rootPayments.length;
     const successful = rootPayments.filter(p => p.isSuccess).length;
     const failed = total - successful;
-    const mppPayments = rootPayments.filter(p => p.shard1Id >= 0 || p.shard2Id >= 0).length;
+    const mppPayments = rootPayments.filter(p => p.shards && p.shards.length > 0).length;
     const singlePayments = total - mppPayments;
     const totalAmount = rootPayments.reduce((sum, p) => sum + p.amount, 0);
     const avgAmount = total > 0 ? totalAmount / total : 0;
@@ -126,7 +119,7 @@ export function PaymentTree({ payments, onPaymentSelect, selectedPaymentId }: Pa
       if (statusFilter === 'failed' && payment.isSuccess) return false;
 
       // Type filter
-      const hasMpp = payment.shard1Id >= 0 || payment.shard2Id >= 0;
+      const hasMpp = payment.shards && payment.shards.length > 0;
       if (typeFilter === 'mpp' && !hasMpp) return false;
       if (typeFilter === 'single' && hasMpp) return false;
       if (typeFilter === 'shard' && !payment.isShard) return false;
@@ -295,7 +288,7 @@ export function PaymentTree({ payments, onPaymentSelect, selectedPaymentId }: Pa
 
   // Render payment row (using cached tree data)
   const renderPaymentRow = (payment: Payment) => {
-    const hasMpp = payment.shard1Id >= 0 || payment.shard2Id >= 0;
+    const hasMpp = payment.shards && payment.shards.length > 0;
     const isExpanded = expandedNodes.has(payment.id);
     const isSelected = selectedPaymentId === payment.id;
     const duration = payment.endTime - payment.startTime;
